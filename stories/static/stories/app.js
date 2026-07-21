@@ -22,10 +22,8 @@ function formattedCopyHtml(value) {
 }
 
 async function copyFormattedText(value) {
-  const plainText = value.replace(/\*\*(.+?)\*\*/g, "$1");
   if (navigator.clipboard.write && window.ClipboardItem) {
     const item = new ClipboardItem({
-      "text/plain": new Blob([plainText], { type: "text/plain" }),
       "text/html": new Blob([formattedCopyHtml(value)], { type: "text/html" }),
     });
     await navigator.clipboard.write([item]);
