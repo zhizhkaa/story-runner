@@ -175,16 +175,42 @@ class StoryRunnerTests(TestCase):
         run.refresh_from_db()
         self.assertEqual(run.final_status, ResultStatus.OK)
         self.assertEqual(run.status_label, "ОК ✅ ⚠️")
-        self.assertEqual(run.display_label, "✅ Android — 1.2.3 (456) ⚠️")
+        self.assertEqual(run.display_label, "✅ ⚠️ Android — 1.2.3 (456)")
+
+    def test_skip_history_adds_run_warning_even_without_reason(self):
+        run = self.make_run()
+        node = run.nodes.get(code="1.1")
+        SkipEvent.objects.create(node=node, participant_name="Анна", reason="")
+        run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
+
+        self.assertTrue(finalize_if_ready(run))
+        run.refresh_from_db()
+        self.assertEqual(run.final_status, ResultStatus.OK)
+        self.assertEqual(run.status_label, "ОК ✅ ⚠️")
+        self.assertEqual(run.display_label, "✅ ⚠️ Android — 1.2.3 (456)")
 
     def test_any_failure_makes_run_failed(self):
         run = self.make_run()
         run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
-        run.nodes.filter(code="1.1").update(result_status=ResultStatus.NOT_OK)
+        run.nodes.filter(code="1.1").update(
+            result_status=ResultStatus.NOT_OK,
+            note="Нужно исправить",
+        )
         finalize_if_ready(run)
         run.refresh_from_db()
         self.assertEqual(run.final_status, ResultStatus.NOT_OK)
+        self.assertEqual(run.status_label, "НЕ ОК ❌ ⚠️")
+        self.assertEqual(run.display_label, "❌ ⚠️ Android — 1.2.3 (456)")
+
+    def test_failure_without_notes_or_skips_has_no_warning(self):
+        run = self.make_run()
+        run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
+        run.nodes.filter(code="1.1").update(result_status=ResultStatus.NOT_OK)
+
+        self.assertTrue(finalize_if_ready(run))
+        run.refresh_from_db()
         self.assertEqual(run.status_label, "НЕ ОК ❌")
+        self.assertEqual(run.display_label, "❌ Android — 1.2.3 (456)")
 
     def test_forced_completion_is_failed_and_releases_claim(self):
         run = self.make_run()

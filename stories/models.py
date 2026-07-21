@@ -76,11 +76,19 @@ class StoryRun(models.Model):
         return self.nodes.filter(kind=NodeKind.CHECK).exclude(note="").exists()
 
     @property
+    def has_skips(self):
+        return self.nodes.filter(kind=NodeKind.CHECK, skip_events__isnull=False).exists()
+
+    @property
+    def has_warnings(self):
+        return self.has_notes or self.has_skips
+
+    @property
     def status_label(self):
         if self.state == self.State.ACTIVE:
             return "АКТИВЕН"
         label = "ОК ✅" if self.final_status == ResultStatus.OK else "НЕ ОК ❌"
-        return f"{label} ⚠️" if self.has_notes else label
+        return f"{label} ⚠️" if self.has_warnings else label
 
     @property
     def display_label(self):
@@ -88,8 +96,8 @@ class StoryRun(models.Model):
         if self.state == self.State.ACTIVE:
             return base
         status_icon = "✅" if self.final_status == ResultStatus.OK else "❌"
-        warning = " ⚠️" if self.has_notes else ""
-        return f"{status_icon} {base}{warning}"
+        warning = " ⚠️" if self.has_warnings else ""
+        return f"{status_icon}{warning} {base}"
 
     @property
     def progress(self):
