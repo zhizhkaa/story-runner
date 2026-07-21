@@ -7,6 +7,7 @@
 Требуется Docker Desktop.
 
 ```bash
+docker network inspect zhizhka-web >/dev/null 2>&1 || docker network create zhizhka-web
 docker compose up --build
 ```
 
@@ -17,6 +18,8 @@ docker compose up --build
 - пароль панели по умолчанию: `change-me`.
 
 Данные сохраняются в `data/story-runner.sqlite3` и не пропадают после перезапуска контейнера.
+Контейнер также подключается к внешней сети `zhizhka-web` с алиасом `story-runner`, сохраняя
+локальный адрес `127.0.0.1:8001`. Сеть нужно создать один раз до первого запуска.
 
 ## Настройка
 
