@@ -14,14 +14,14 @@
       <div class="mb-2 flex items-center justify-between"><label class="text-sm font-medium text-zinc-700" for="outline">Структура</label><span class="text-xs text-zinc-400">Tab — добавить отступ</span></div>
       <div class="outline-field relative overflow-hidden rounded-2xl border border-zinc-300 bg-white shadow-sm focus-within:border-zinc-500 focus-within:ring-2 focus-within:ring-zinc-200">
         <div class="outline-active-line pointer-events-none absolute inset-x-2 top-0 z-0 hidden h-7 rounded-lg bg-blue-100/80" aria-hidden="true"></div>
-        <textarea id="outline" name="outline" class="outline-editor relative z-10 block min-h-[70vh] w-full resize-y border-0 bg-transparent p-5 font-mono text-sm leading-7 text-zinc-800 outline-none placeholder:text-zinc-400" spellcheck="false" required>{{ outline }}</textarea>
+        <textarea id="outline" name="outline" class="outline-editor relative z-10 block min-h-[70vh] w-full resize-y border-0 bg-transparent p-5 font-mono text-sm leading-7 text-zinc-800 outline-none placeholder:text-zinc-400" wrap="off" spellcheck="false" required>{{ outline }}</textarea>
       </div>
     </section>
     <section>
       <div class="mb-2 text-sm font-medium text-zinc-700">Нумерация</div>
       <div class="outline-field relative overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100 focus-within:border-zinc-400 focus-within:ring-2 focus-within:ring-zinc-200">
         <div class="outline-active-line pointer-events-none absolute inset-x-2 top-0 z-0 hidden h-7 rounded-lg bg-blue-200/70" aria-hidden="true"></div>
-        <textarea id="outline-preview" class="outline-preview relative z-10 block min-h-[70vh] w-full cursor-default resize-y border-0 bg-transparent p-5 font-mono text-sm leading-7 text-zinc-700 outline-none" readonly aria-label="Автоматическая нумерация">{{ preview }}</textarea>
+        <textarea id="outline-preview" class="outline-preview relative z-10 block min-h-[70vh] w-full cursor-default resize-y border-0 bg-transparent p-5 font-mono text-sm leading-7 text-zinc-700 outline-none" wrap="off" readonly aria-label="Автоматическая нумерация">{{ preview }}</textarea>
       </div>
     </section>
   </div>

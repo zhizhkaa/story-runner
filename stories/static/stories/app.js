@@ -298,10 +298,7 @@ document.querySelectorAll(".outline-editor").forEach((editor) => {
       source.addEventListener("scroll", () => {
         if (syncingScroll) return;
         syncingScroll = true;
-        const sourceRange = source.scrollHeight - source.clientHeight;
-        const targetRange = target.scrollHeight - target.clientHeight;
-        const ratio = sourceRange > 0 ? source.scrollTop / sourceRange : 0;
-        target.scrollTop = ratio * Math.max(targetRange, 0);
+        target.scrollTop = source.scrollTop;
         renderActiveLine();
         requestAnimationFrame(() => { syncingScroll = false; });
       });

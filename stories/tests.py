@@ -58,6 +58,7 @@ class StoryRunnerTests(TestCase):
         page = self.client.get(reverse("stories:manage_template"))
         self.assertContains(page, "Нумерация")
         self.assertContains(page, "outline-active-line", count=2)
+        self.assertContains(page, 'wrap="off"', count=2)
         response = self.client.post(
             reverse("stories:manage_template"),
             {"outline": "Раздел\n  Первый пункт\n  Подраздел\n    Вложенный пункт"},
