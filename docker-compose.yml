@@ -1,9 +1,10 @@
 services:
   web:
+    container_name: story-runner-web
     build: .
     restart: unless-stopped
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
     environment:
       DEBUG: ${DEBUG:-1}
       SECRET_KEY: ${SECRET_KEY:-dev-only-change-me}
@@ -19,3 +20,12 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      default:
+      web_proxy:
+        aliases:
+          - story-runner
+
+networks:
+  web_proxy:
+    name: zhizhka-web
