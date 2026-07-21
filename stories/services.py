@@ -232,13 +232,27 @@ def claimed_node_names(run):
     }
 
 
-def node_status(run, node, claimed_names):
+def node_visible_note(node, skip_events=None):
+    notes = []
+    if node.note:
+        notes.append(node.note)
+    events = list(skip_events) if skip_events is not None else list(node.skip_events.all())
+    for event in events:
+        reason = event.reason.strip()
+        if reason and reason not in notes:
+            notes.append(reason)
+    return " · ".join(notes)
+
+
+def node_status(run, node, claimed_names, was_skipped=False):
     if node.result_status == ResultStatus.OK:
         return "ОК ✅", "ok"
     if node.result_status == ResultStatus.NOT_OK:
         return "НЕ ОК ❌", "not_ok"
     if run.state == StoryRun.State.ACTIVE and node.id in claimed_names:
         return f"В работе — {claimed_names[node.id]}", "working"
+    if was_skipped:
+        return "Пропуск", "skip"
     if run.state == StoryRun.State.ACTIVE:
         return "Свободен", "empty"
     return "БЕЗ РЕЗУЛЬТАТА", "empty"
@@ -247,16 +261,19 @@ def node_status(run, node, claimed_names):
 def run_text(run):
     lines = []
     claimed_names = claimed_node_names(run)
-    for node, depth in tree_rows(list(run.nodes.all())):
+    nodes = list(run.nodes.prefetch_related("skip_events").all())
+    for node, depth in tree_rows(nodes):
         indent = "  " * depth
         if node.kind == NodeKind.GROUP:
             line = f"{indent}{node.code} {node.title}"
         else:
-            status, _tone = node_status(run, node, claimed_names)
-            warning = " ⚠️" if node.note else ""
+            skip_events = list(node.skip_events.all())
+            visible_note = node_visible_note(node, skip_events)
+            status, _tone = node_status(run, node, claimed_names, bool(skip_events))
+            warning = " ⚠️" if visible_note else ""
             line = f"{indent}{node.code} {node.title} — {status}{warning}"
-            if node.note:
-                line += f" — {node.note}"
+            if visible_note:
+                line += f" — {visible_note}"
         lines.append(line)
     return "\n".join(lines)
 
@@ -264,18 +281,26 @@ def run_text(run):
 def run_result_rows(run):
     rows = []
     claimed_names = claimed_node_names(run)
-    for node, depth in tree_rows(list(run.nodes.all())):
+    nodes = list(run.nodes.prefetch_related("skip_events").all())
+    for node, depth in tree_rows(nodes):
+        skip_events = list(node.skip_events.all())
+        visible_note = node_visible_note(node, skip_events)
         row = {
             "node": node,
             "indent": f"{depth * 1.25:g}rem",
             "is_group": node.kind == NodeKind.GROUP,
             "status_label": "",
             "status_tone": "",
-            "note": node.note,
+            "note": visible_note,
         }
         if node.kind == NodeKind.CHECK:
-            row["status_label"], row["status_tone"] = node_status(run, node, claimed_names)
-            if node.note:
+            row["status_label"], row["status_tone"] = node_status(
+                run,
+                node,
+                claimed_names,
+                bool(skip_events),
+            )
+            if visible_note:
                 row["status_label"] += " ⚠️"
         rows.append(row)
     return rows

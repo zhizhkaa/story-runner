@@ -5,11 +5,13 @@ from django.urls import reverse
 from .models import Claim, DraftResult, NodeKind, Participant, ResultStatus, RunNode, SkipEvent, StoryRun, StoryTemplate
 from .outline import numbered_outline, parse_outline, replace_template_from_outline
 from .services import (
+    PARTICIPANT_COOKIE,
     create_claim,
     create_participant,
     create_run_from_template,
     finalize_if_ready,
     force_complete,
+    run_result_rows,
     run_text,
     submit_claim,
 )
@@ -108,13 +110,33 @@ class StoryRunnerTests(TestCase):
         run.refresh_from_db()
         self.assertEqual(run.state, StoryRun.State.ACTIVE)
 
-        second = self.participant("Борис")
+        skipped_row = next(row for row in run_result_rows(run) if row["node"].pk == skipped.pk)
+        self.assertEqual(skipped_row["status_label"], "Пропуск ⚠️")
+        self.assertEqual(skipped_row["note"], "Нет тестовых данных")
+        self.assertIn(
+            "8.1.а Сдача биометрии — Пропуск ⚠️ — Нет тестовых данных",
+            run_text(run),
+        )
+        select_page = self.client.get(reverse("stories:claim_select", args=[run.public_id]))
+        self.assertContains(select_page, "Пропуск")
+        self.assertContains(select_page, "Нет тестовых данных")
+
+        second, second_token = create_participant("Борис")
         second_claim = create_claim(run, second, [skipped.id])
+        second_client = Client()
+        second_client.cookies[PARTICIPANT_COOKIE] = second_token
+        work_page = second_client.get(reverse("stories:claim_work", args=[second_claim.public_id]))
+        self.assertContains(work_page, "Пропуск · Анна")
+        self.assertContains(work_page, "Нет тестовых данных")
+        self.assertNotContains(work_page, "<details")
         item = second_claim.items.get()
         submit_claim(second_claim, {f"action_{item.id}": "ok", f"note_{item.id}": ""})
         skipped.refresh_from_db()
         self.assertEqual(skipped.result_status, ResultStatus.OK)
         self.assertEqual(skipped.completed_by_name, "Борис")
+        completed_row = next(row for row in run_result_rows(run) if row["node"].pk == skipped.pk)
+        self.assertEqual(completed_row["status_label"], "ОК ✅ ⚠️")
+        self.assertEqual(completed_row["note"], "Нет тестовых данных")
 
     def test_incomplete_submit_keeps_entered_drafts(self):
         run = self.make_run()

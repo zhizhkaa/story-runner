@@ -37,6 +37,7 @@ from .services import (
     save_claim_drafts,
     submit_claim,
     tree_rows,
+    node_visible_note,
 )
 
 
@@ -79,6 +80,7 @@ def annotated_run_tree(run):
     rows = []
     for node, depth in tree_rows(nodes):
         done, busy, free, total = stats(node.id)
+        skip_events = list(node.skip_events.all())
         rows.append(
             {
                 "node": node,
@@ -89,13 +91,15 @@ def annotated_run_tree(run):
                 "total": total,
                 "claimable": free > 0,
                 "claimed_by": claimed.get(node.id, ""),
+                "was_skipped": bool(skip_events),
+                "visible_note": node_visible_note(node, skip_events),
             }
         )
     return rows
 
 
 def claim_work_rows(claim, items):
-    nodes = list(claim.run.nodes.select_related("parent").all())
+    nodes = list(claim.run.nodes.select_related("parent").prefetch_related("skip_events").all())
     by_id = {node.id: node for node in nodes}
     item_by_node_id = {item.node_id: item for item in items}
     included_ids = set(item_by_node_id)
@@ -105,11 +109,21 @@ def claim_work_rows(claim, items):
             included_ids.add(parent_id)
             parent_id = by_id[parent_id].parent_id
 
-    return [
-        {"node": node, "depth": depth, "item": item_by_node_id.get(node.id)}
-        for node, depth in tree_rows(nodes)
-        if node.id in included_ids
-    ]
+    rows = []
+    for node, depth in tree_rows(nodes):
+        if node.id not in included_ids:
+            continue
+        skip_events = list(node.skip_events.all())
+        rows.append(
+            {
+                "node": node,
+                "depth": depth,
+                "item": item_by_node_id.get(node.id),
+                "skip_events": skip_events,
+                "visible_note": node_visible_note(node, skip_events),
+            }
+        )
+    return rows
 
 
 @require_GET
@@ -323,7 +337,7 @@ def claim_work(request, public_id):
             except ValueError as exc:
                 messages.error(request, str(exc))
             else:
-                messages.success(request, "Результаты отправлены. Пропущенные пункты освобождены.")
+                messages.success(request, "Результаты отправлены. Пропущенные пункты доступны другим участникам.")
                 return redirect("stories:home")
 
     items = list(claim.items.select_related("node").prefetch_related("node__skip_events", "draft"))

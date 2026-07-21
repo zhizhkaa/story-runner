@@ -13,8 +13,10 @@
       <article class="claim-work-row grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_19rem_minmax(12rem,17rem)] lg:items-center {% if row.node.kind == 'group' %}bg-zinc-50/80{% endif %}" style="padding-left: calc(0.75rem + {{ row.depth }} * 1.25rem)" data-work-depth="{{ row.depth }}" data-work-kind="{{ row.node.kind }}">
         <div class="min-w-0">
           <div class="flex items-baseline gap-2"><span class="shrink-0 font-mono text-xs font-semibold text-emerald-700">{{ row.node.code }}</span><h2 class="min-w-0 text-sm {% if row.node.kind == 'group' %}font-semibold{% else %}font-medium{% endif %} leading-5 text-zinc-900">{{ row.node.title }}</h2></div>
-          {% if row.item.node.skip_events.exists %}
-            <details class="mt-1 text-xs text-zinc-400"><summary class="cursor-pointer">Пропускали: {{ row.item.node.skip_events.count }}</summary><ul class="mt-1 grid gap-0.5 pl-4">{% for event in row.item.node.skip_events.all %}<li><strong class="text-zinc-600">{{ event.participant_name }}</strong>, {{ event.created_at|date:'d.m.Y H:i' }}{% if event.reason %} — {{ event.reason }}{% endif %}</li>{% endfor %}</ul></details>
+          {% if row.skip_events %}
+            <ul class="mt-1 grid gap-0.5 text-xs leading-5 text-amber-700">
+              {% for event in row.skip_events %}<li><strong>Пропуск · {{ event.participant_name }}</strong>, {{ event.created_at|date:'d.m.Y H:i' }}{% if event.reason %} — {{ event.reason }}{% endif %}</li>{% endfor %}
+            </ul>
           {% endif %}
         </div>
 

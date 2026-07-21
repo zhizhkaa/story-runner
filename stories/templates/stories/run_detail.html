@@ -39,7 +39,7 @@
       {% if row.is_group %}
         <strong class="font-semibold text-zinc-950">{{ row.node.code }} {{ row.node.title }}</strong>
       {% else %}
-        <span>{{ row.node.code }} {{ row.node.title }} — </span><strong class="font-semibold {% if row.status_tone == 'ok' %}text-emerald-700{% elif row.status_tone == 'not_ok' %}text-red-700{% elif row.status_tone == 'working' %}text-blue-700{% else %}text-zinc-500{% endif %}">{{ row.status_label }}</strong>{% if row.note %}<span class="ml-2 text-zinc-500">— {{ row.note }}</span>{% endif %}
+        <span>{{ row.node.code }} {{ row.node.title }} — </span><strong class="font-semibold {% if row.status_tone == 'ok' %}text-emerald-700{% elif row.status_tone == 'not_ok' %}text-red-700{% elif row.status_tone == 'working' %}text-blue-700{% elif row.status_tone == 'skip' %}text-amber-700{% else %}text-zinc-500{% endif %}">{{ row.status_label }}</strong>{% if row.note %}<span class="ml-2 text-zinc-500">— {{ row.note }}</span>{% endif %}
       {% endif %}
     </div>
   {% endfor %}

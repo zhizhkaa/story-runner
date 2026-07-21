@@ -43,7 +43,18 @@
         <details class="mt-5 rounded-xl border border-zinc-200">
           <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">Пункты</summary>
           <div class="border-t border-zinc-200">
-            {% for row in run.tree_rows %}<div class="flex min-h-10 items-center gap-3 border-t border-zinc-100 px-4 py-2 text-sm first:border-t-0" style="padding-left: calc(1rem + {{ row.depth }} * 1.1rem)"><span class="min-w-0 flex-1 truncate"><strong>{{ row.node.code }}</strong> {{ row.node.title }}</span>{% if row.node.kind == 'check' %}<span class="shrink-0 text-xs text-zinc-500">{% if row.node.result_status == 'ok' %}ОК ✅{% elif row.node.result_status == 'not_ok' %}НЕ ОК ❌{% elif row.claimed_by %}{{ row.claimed_by }}{% else %}Свободен{% endif %}</span>{% if row.node.result_status %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="reset_node"><input type="hidden" name="node_id" value="{{ row.node.id }}"><button class="text-xs text-zinc-400 hover:text-red-600" type="submit" data-confirm="Сбросить результат пункта?">Сбросить</button></form>{% endif %}{% endif %}</div>{% endfor %}
+            {% for row in run.tree_rows %}
+              <div class="flex min-h-10 items-center gap-3 border-t border-zinc-100 px-4 py-2 text-sm first:border-t-0" style="padding-left: calc(1rem + {{ row.depth }} * 1.1rem)">
+                <span class="grid min-w-0 flex-1 gap-0.5">
+                  <span class="truncate"><strong>{{ row.node.code }}</strong> {{ row.node.title }}</span>
+                  {% if row.visible_note %}<span class="text-xs leading-5 text-amber-700">⚠️ {{ row.visible_note }}</span>{% endif %}
+                </span>
+                {% if row.node.kind == 'check' %}
+                  <span class="shrink-0 text-xs {% if row.was_skipped and not row.node.result_status and not row.claimed_by %}font-medium text-amber-700{% else %}text-zinc-500{% endif %}">{% if row.node.result_status == 'ok' %}ОК ✅{% elif row.node.result_status == 'not_ok' %}НЕ ОК ❌{% elif row.claimed_by %}{{ row.claimed_by }}{% elif row.was_skipped %}Пропуск{% else %}Свободен{% endif %}</span>
+                  {% if row.node.result_status %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="reset_node"><input type="hidden" name="node_id" value="{{ row.node.id }}"><button class="text-xs text-zinc-400 hover:text-red-600" type="submit" data-confirm="Сбросить результат пункта?">Сбросить</button></form>{% endif %}
+                {% endif %}
+              </div>
+            {% endfor %}
           </div>
         </details>
         <form method="post" class="mt-5 text-right">{% csrf_token %}<input type="hidden" name="action" value="force_complete"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50" type="submit" data-confirm="Досрочно завершить прогон со статусом «НЕ ОК»?">Завершить досрочно</button></form>
