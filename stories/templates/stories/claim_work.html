@@ -1,0 +1,42 @@
+{% extends 'stories/base.html' %}
+{% block title %}Прогон{% endblock %}
+{% block content %}
+<div class="border-b border-zinc-200 pb-4">
+  <p class="text-xs text-zinc-500">{{ claim.run.get_os_display }} — {{ claim.run.version }} ({{ claim.run.build }})</p>
+  <h1 class="mt-1 text-2xl font-semibold tracking-tight">{{ claim.participant.display_name }}</h1>
+</div>
+
+<form method="post" class="mt-4">
+  {% csrf_token %}
+  <div class="claim-work-tree divide-y divide-zinc-100 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+    {% for row in rows %}
+      <article class="claim-work-row grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_19rem_minmax(12rem,17rem)] lg:items-center {% if row.node.kind == 'group' %}bg-zinc-50/80{% endif %}" style="padding-left: calc(0.75rem + {{ row.depth }} * 1.25rem)" data-work-depth="{{ row.depth }}" data-work-kind="{{ row.node.kind }}">
+        <div class="min-w-0">
+          <div class="flex items-baseline gap-2"><span class="shrink-0 font-mono text-xs font-semibold text-emerald-700">{{ row.node.code }}</span><h2 class="min-w-0 text-sm {% if row.node.kind == 'group' %}font-semibold{% else %}font-medium{% endif %} leading-5 text-zinc-900">{{ row.node.title }}</h2></div>
+          {% if row.item.node.skip_events.exists %}
+            <details class="mt-1 text-xs text-zinc-400"><summary class="cursor-pointer">Пропускали: {{ row.item.node.skip_events.count }}</summary><ul class="mt-1 grid gap-0.5 pl-4">{% for event in row.item.node.skip_events.all %}<li><strong class="text-zinc-600">{{ event.participant_name }}</strong>, {{ event.created_at|date:'d.m.Y H:i' }}{% if event.reason %} — {{ event.reason }}{% endif %}</li>{% endfor %}</ul></details>
+          {% endif %}
+        </div>
+
+        <fieldset class="grid grid-cols-3 gap-2" data-status-controls>
+          <legend class="sr-only">Результат для {{ row.node.code }}</legend>
+          <label class="cursor-pointer"><input class="peer sr-only {% if row.node.kind == 'group' %}claim-group-action{% else %}claim-item-action{% endif %}" type="radio" name="{% if row.item %}action_{{ row.item.id }}{% else %}group_action_{{ row.node.id }}{% endif %}" value="ok" {% if row.item.draft_action == 'ok' %}checked{% endif %}><span class="block rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-center text-xs font-semibold text-emerald-700 transition hover:border-emerald-400 peer-checked:border-emerald-700 peer-checked:bg-emerald-600 peer-checked:text-white peer-checked:ring-2 peer-checked:ring-emerald-200">ОК ✅</span></label>
+          <label class="cursor-pointer"><input class="peer sr-only {% if row.node.kind == 'group' %}claim-group-action{% else %}claim-item-action{% endif %}" type="radio" name="{% if row.item %}action_{{ row.item.id }}{% else %}group_action_{{ row.node.id }}{% endif %}" value="not_ok" {% if row.item.draft_action == 'not_ok' %}checked{% endif %}><span class="block rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-center text-xs font-semibold text-red-700 transition hover:border-red-400 peer-checked:border-red-700 peer-checked:bg-red-600 peer-checked:text-white peer-checked:ring-2 peer-checked:ring-red-200">НЕ ОК ❌</span></label>
+          <label class="cursor-pointer"><input class="peer sr-only {% if row.node.kind == 'group' %}claim-group-action{% else %}claim-item-action{% endif %}" type="radio" name="{% if row.item %}action_{{ row.item.id }}{% else %}group_action_{{ row.node.id }}{% endif %}" value="skip" {% if row.item.draft_action == 'skip' %}checked{% endif %}><span class="block rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-center text-xs font-semibold text-amber-700 transition hover:border-amber-400 peer-checked:border-amber-700 peer-checked:bg-amber-500 peer-checked:text-white peer-checked:ring-2 peer-checked:ring-amber-200">Пропуск</span></label>
+        </fieldset>
+
+        <label>
+          <span class="sr-only">Примечание для {{ row.node.code }}</span>
+          <textarea class="claim-note h-9 min-h-9 w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm leading-5 text-zinc-950 placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200" name="{% if row.item %}note_{{ row.item.id }}{% else %}group_note_{{ row.node.id }}{% endif %}" rows="1" placeholder="Примечание">{{ row.item.draft_note }}</textarea>
+        </label>
+      </article>
+    {% endfor %}
+  </div>
+
+  <div class="sticky bottom-3 mt-3 flex flex-col gap-2 rounded-xl border border-zinc-200 bg-white/95 p-2.5 shadow-lg backdrop-blur sm:flex-row sm:justify-end">
+    <button class="min-h-10 rounded-lg border border-zinc-300 px-4 text-sm font-medium hover:bg-zinc-50" type="submit" name="form_action" value="save">Сохранить</button>
+    <button class="min-h-10 rounded-lg border border-red-200 px-4 text-sm font-medium text-red-700 hover:bg-red-50" type="submit" name="form_action" value="release" data-confirm="Освободить все взятые пункты? Черновик будет удалён.">Освободить</button>
+    <button class="min-h-10 rounded-lg bg-zinc-950 px-5 text-sm font-medium text-white hover:bg-zinc-800" type="submit" name="form_action" value="submit">Отправить</button>
+  </div>
+</form>
+{% endblock %}

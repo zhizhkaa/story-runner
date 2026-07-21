@@ -1,0 +1,35 @@
+{% load static %}
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>{% block title %}Прогоны{% endblock %}</title>
+  {% block meta %}{% endblock %}
+  <link rel="stylesheet" href="{% static 'stories/styles.css' %}">
+  <script src="{% static 'stories/app.js' %}" defer></script>
+</head>
+<body class="min-h-screen bg-zinc-50 font-sans text-zinc-950 antialiased">
+  <main class="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <nav class="mb-10 flex min-h-9 items-center justify-end gap-5 text-sm text-zinc-500" aria-label="Навигация">
+      {% if request.session.story_admin %}
+        <a class="transition hover:text-zinc-950" href="{% url 'stories:home' %}">Главная</a>
+        <a class="transition hover:text-zinc-950" href="{% url 'stories:manage_dashboard' %}">Управление</a>
+        <form method="post" action="{% url 'stories:manage_logout' %}">{% csrf_token %}<button class="transition hover:text-zinc-950" type="submit">Выйти</button></form>
+      {% else %}
+        <a class="transition hover:text-zinc-950" href="{% url 'stories:manage_login' %}">Редактировать</a>
+      {% endif %}
+    </nav>
+
+    {% if messages %}
+      <div class="mb-6 grid gap-2" aria-live="polite">
+        {% for message in messages %}
+          <div class="rounded-xl border px-4 py-3 text-sm {% if message.tags == 'error' %}border-red-200 bg-red-50 text-red-800{% elif message.tags == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-800{% else %}border-zinc-200 bg-white text-zinc-700{% endif %}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

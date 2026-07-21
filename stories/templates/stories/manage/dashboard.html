@@ -1,0 +1,61 @@
+{% extends 'stories/base.html' %}
+{% block title %}Управление{% endblock %}
+{% block content %}
+<div class="flex flex-col gap-4 border-b border-zinc-200 pb-6 sm:flex-row sm:items-center sm:justify-between">
+  <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">Управление</h1>
+  <a class="inline-flex min-h-10 items-center justify-center rounded-xl border border-zinc-300 bg-white px-4 text-sm font-medium hover:bg-zinc-50" href="{% url 'stories:manage_template' %}">Редактировать шаблон</a>
+</div>
+
+<section class="mt-6 grid gap-4 lg:grid-cols-[2fr_1fr]">
+  <article class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+    <h2 class="text-xl font-semibold">Новый прогон</h2>
+    <form method="post" class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-[10rem_1fr_1fr_auto] xl:items-end">
+      {% csrf_token %}<input type="hidden" name="action" value="create_run">
+      <label class="grid gap-1.5 text-sm text-zinc-600"><span>ОС</span><select class="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-zinc-950" name="os" required><option value="android">Android</option><option value="ios">iOS</option></select></label>
+      <label class="grid gap-1.5 text-sm text-zinc-600"><span>Версия</span><input class="h-11 rounded-xl border border-zinc-300 px-3 text-zinc-950" name="version" maxlength="64" required placeholder="1.2.3"></label>
+      <label class="grid gap-1.5 text-sm text-zinc-600"><span>Сборка</span><input class="h-11 rounded-xl border border-zinc-300 px-3 text-zinc-950" name="build" maxlength="64" required placeholder="456"></label>
+      <button class="h-11 rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white hover:bg-zinc-800" type="submit">Создать</button>
+    </form>
+  </article>
+  <a class="group flex min-h-40 flex-col rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300" href="{% url 'stories:manage_template' %}">
+    <span class="text-sm text-zinc-500">Шаблон</span><strong class="mt-auto text-5xl font-semibold tracking-tight">{{ template.nodes.count }}</strong><span class="mt-1 text-sm text-zinc-400">строк · редактировать →</span>
+  </a>
+</section>
+
+<section class="mt-14">
+  <h2 class="text-2xl font-semibold tracking-tight">Прогоны</h2>
+  <div class="mt-4 grid gap-4">
+    {% for run in active_runs %}
+      <article class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+        <header class="flex flex-wrap items-center gap-3">
+          <span class="rounded-full px-2.5 py-1 text-xs font-medium {% if run.os == 'android' %}bg-emerald-100 text-emerald-800{% else %}bg-zinc-200 text-zinc-700{% endif %}">{{ run.get_os_display }}</span>
+          <h3 class="flex-1 text-lg font-semibold">{{ run.version }} <span class="font-normal text-zinc-400">({{ run.build }})</span></h3>
+          <strong class="text-sm tabular-nums text-zinc-500">{{ run.done_count }}/{{ run.total_count }}</strong>
+        </header>
+        <div class="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100"><div class="h-full rounded-full bg-emerald-600" style="width: {% widthratio run.done_count run.total_count 100 %}%"></div></div>
+
+        {% if run.open_claims %}
+          <div class="mt-5 divide-y divide-zinc-100 rounded-xl bg-zinc-50 px-4">
+            {% for claim in run.open_claims %}<div class="flex items-center justify-between gap-3 py-3 text-sm"><span>{{ claim.participant.display_name }} · {{ claim.items.count }} пунктов</span><form method="post">{% csrf_token %}<input type="hidden" name="action" value="release_claim"><input type="hidden" name="claim_id" value="{{ claim.id }}"><button class="text-red-600 hover:text-red-800" type="submit" data-confirm="Освободить назначение участника?">Освободить</button></form></div>{% endfor %}
+          </div>
+        {% endif %}
+
+        <details class="mt-5 rounded-xl border border-zinc-200">
+          <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">Пункты</summary>
+          <div class="border-t border-zinc-200">
+            {% for row in run.tree_rows %}<div class="flex min-h-10 items-center gap-3 border-t border-zinc-100 px-4 py-2 text-sm first:border-t-0" style="padding-left: calc(1rem + {{ row.depth }} * 1.1rem)"><span class="min-w-0 flex-1 truncate"><strong>{{ row.node.code }}</strong> {{ row.node.title }}</span>{% if row.node.kind == 'check' %}<span class="shrink-0 text-xs text-zinc-500">{% if row.node.result_status == 'ok' %}ОК ✅{% elif row.node.result_status == 'not_ok' %}НЕ ОК ❌{% elif row.claimed_by %}{{ row.claimed_by }}{% else %}Свободен{% endif %}</span>{% if row.node.result_status %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="reset_node"><input type="hidden" name="node_id" value="{{ row.node.id }}"><button class="text-xs text-zinc-400 hover:text-red-600" type="submit" data-confirm="Сбросить результат пункта?">Сбросить</button></form>{% endif %}{% endif %}</div>{% endfor %}
+          </div>
+        </details>
+        <form method="post" class="mt-5 text-right">{% csrf_token %}<input type="hidden" name="action" value="force_complete"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50" type="submit" data-confirm="Досрочно завершить прогон со статусом «НЕ ОК»?">Завершить досрочно</button></form>
+      </article>
+    {% empty %}<div class="rounded-2xl border border-dashed border-zinc-300 px-6 py-12 text-center text-sm text-zinc-500">Активных прогонов нет</div>{% endfor %}
+  </div>
+</section>
+
+{% if recent_runs %}
+<section class="mt-14">
+  <h2 class="text-2xl font-semibold tracking-tight">Недавние</h2>
+  <div class="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">{% for run in recent_runs %}<a class="flex flex-col gap-1 border-t border-zinc-100 px-5 py-4 text-sm transition first:border-t-0 hover:bg-zinc-50 sm:flex-row sm:items-center sm:justify-between" href="{% url 'stories:run_detail' run.public_id %}" target="_blank" rel="noopener"><span>{{ run.display_label }}</span><time class="text-zinc-400">{{ run.completed_at|date:'d.m.Y H:i' }}</time></a>{% endfor %}</div>
+</section>
+{% endif %}
+{% endblock %}

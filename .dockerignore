@@ -1,0 +1,10 @@
+.DS_Store
+.env
+.git
+.venv
+__pycache__
+*.pyc
+data
+staticfiles
+.pytest_cache
+node_modules
