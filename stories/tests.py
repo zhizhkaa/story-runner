@@ -114,7 +114,7 @@ class StoryRunnerTests(TestCase):
         self.assertEqual(skipped_row["status_label"], "Пропуск ⚠️")
         self.assertEqual(skipped_row["note"], "Нет тестовых данных")
         self.assertIn(
-            "8.1.а Сдача биометрии — Пропуск ⚠️ — Нет тестовых данных",
+            "8.1.а Сдача биометрии — **Пропуск ⚠️** — Нет тестовых данных",
             run_text(run),
         )
         select_page = self.client.get(reverse("stories:claim_select", args=[run.public_id]))
@@ -305,10 +305,27 @@ class StoryRunnerTests(TestCase):
         node.completed_by_name = "Анна"
         node.save(update_fields=["result_status", "note", "completed_by_name"])
         text = run_text(run)
+        self.assertTrue(text.startswith("Android — 1.2.3 (456)\n\n"))
         self.assertIn(
-            "1.1 Построение маршрута — ОК ✅ ⚠️ — Нужно перепроверить",
+            "1.1 Построение маршрута — **ОК ⚠️** — Нужно перепроверить",
             text,
         )
+        self.assertIn("**1. Раздел метро**", text)
+        self.assertIn("\n\n**2. Авторизация**", text)
+        self.assertNotIn("1.1 Построение маршрута — **ОК ✅", text)
         self.assertNotIn("Проверил", text)
         self.assertNotIn("Пропуск", text)
         self.assertNotIn("Примечание", text)
+
+    def test_copied_text_marks_only_completed_top_level_sections_with_check(self):
+        run = self.make_run()
+        run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
+        run.nodes.filter(code="2.1").update(result_status=ResultStatus.NOT_OK)
+        text = run_text(run)
+
+        self.assertIn("**✅ 1. Раздел метро**", text)
+        self.assertIn("**❌ 2. Авторизация**", text)
+        self.assertIn("  **8.1 Биометрия**", text)
+        self.assertNotIn("✅ 8.1", text)
+        self.assertNotIn("— **ОК ✅**", text)
+        self.assertNotIn("— **НЕ ОК ❌**", text)

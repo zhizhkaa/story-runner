@@ -4,6 +4,36 @@ function flashButton(button, text) {
   setTimeout(() => { button.textContent = original; }, 1500);
 }
 
+function escapedHtml(value) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function formattedCopyHtml(value) {
+  return value.split("\n").map((line) => {
+    const leadingSpaces = line.match(/^ */)[0].replaceAll(" ", "&nbsp;");
+    const content = escapedHtml(line.trimStart()).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    return `${leadingSpaces}${content}`;
+  }).join("<br>");
+}
+
+async function copyFormattedText(value) {
+  const plainText = value.replace(/\*\*(.+?)\*\*/g, "$1");
+  if (navigator.clipboard.write && window.ClipboardItem) {
+    const item = new ClipboardItem({
+      "text/plain": new Blob([plainText], { type: "text/plain" }),
+      "text/html": new Blob([formattedCopyHtml(value)], { type: "text/html" }),
+    });
+    await navigator.clipboard.write([item]);
+    return;
+  }
+  await navigator.clipboard.writeText(value);
+}
+
 document.addEventListener("click", async (event) => {
   const confirmTarget = event.target.closest("[data-confirm]");
   if (confirmTarget && !window.confirm(confirmTarget.dataset.confirm)) {
@@ -14,7 +44,7 @@ document.addEventListener("click", async (event) => {
   const copyText = event.target.closest(".copy-text");
   if (copyText) {
     const target = document.getElementById(copyText.dataset.copyTarget);
-    await navigator.clipboard.writeText(target.value);
+    await copyFormattedText(target.value);
     flashButton(copyText, "Скопировано");
   }
 

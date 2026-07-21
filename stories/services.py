@@ -259,19 +259,39 @@ def node_status(run, node, claimed_names, was_skipped=False):
 
 
 def run_text(run):
-    lines = []
+    lines = [f"{run.get_os_display()} — {run.version} ({run.build})", ""]
     claimed_names = claimed_node_names(run)
     nodes = list(run.nodes.prefetch_related("skip_events").all())
-    for node, depth in tree_rows(nodes):
+    rows = tree_rows(nodes)
+    for index, (node, depth) in enumerate(rows):
+        if depth == 0 and index:
+            lines.append("")
         indent = "  " * depth
         if node.kind == NodeKind.GROUP:
-            line = f"{indent}{node.code} {node.title}"
+            icon = ""
+            display_code = node.code
+            if depth == 0:
+                display_code = node.code if node.code.endswith(".") else f"{node.code}."
+                descendants = []
+                for descendant, descendant_depth in rows[index + 1 :]:
+                    if descendant_depth == 0:
+                        break
+                    if descendant.kind == NodeKind.CHECK:
+                        descendants.append(descendant)
+                if descendants and all(item.result_status == ResultStatus.OK for item in descendants):
+                    icon = "✅ "
+                elif any(item.result_status == ResultStatus.NOT_OK for item in descendants):
+                    icon = "❌ "
+                elif run.state == StoryRun.State.COMPLETED:
+                    icon = "❌ "
+            line = f"{indent}**{icon}{display_code} {node.title}**"
         else:
             skip_events = list(node.skip_events.all())
             visible_note = node_visible_note(node, skip_events)
             status, _tone = node_status(run, node, claimed_names, bool(skip_events))
+            status = status.replace(" ✅", "").replace(" ❌", "")
             warning = " ⚠️" if visible_note else ""
-            line = f"{indent}{node.code} {node.title} — {status}{warning}"
+            line = f"{indent}{node.code} {node.title} — **{status}{warning}**"
             if visible_note:
                 line += f" — {visible_note}"
         lines.append(line)
