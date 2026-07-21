@@ -266,6 +266,8 @@ def run_text(run):
     for index, (node, depth) in enumerate(rows):
         if depth == 0 and index:
             lines.append("")
+        elif node.kind == NodeKind.GROUP and depth == 1 and rows[index - 1][1] >= 1:
+            lines.append("")
         indent = "  " * depth
         if node.kind == NodeKind.GROUP:
             icon = ""
@@ -284,7 +286,8 @@ def run_text(run):
                     icon = "❌ "
                 elif run.state == StoryRun.State.COMPLETED:
                     icon = "❌ "
-            line = f"{indent}**{icon}{display_code} {node.title}**"
+            group_text = f"{icon}{display_code} {node.title}"
+            line = f"{indent}**{group_text}**" if depth <= 1 else f"{indent}{group_text}"
         else:
             skip_events = list(node.skip_events.all())
             visible_note = node_visible_note(node, skip_events)
