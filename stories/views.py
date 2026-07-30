@@ -401,6 +401,12 @@ def manage_dashboard(request):
             force_complete(run)
             messages.success(request, "Прогон досрочно завершён со статусом «НЕ ОК».")
             return redirect("stories:manage_dashboard")
+        if action == "delete_run":
+            run = get_object_or_404(StoryRun, pk=request.POST.get("run_id"))
+            run_label = run.display_label
+            run.delete()
+            messages.success(request, f"Прогон «{run_label}» удалён.")
+            return redirect("stories:manage_dashboard")
         if action == "release_claim":
             claim = get_object_or_404(Claim, pk=request.POST.get("claim_id"), state=Claim.State.OPEN)
             release_claim(claim)

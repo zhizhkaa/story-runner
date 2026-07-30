@@ -14,6 +14,18 @@ docker compose start
 
 ## Обновление
 
+Обычный push запускает CI. Production-деплой запускается после успешного CI
+аннотированным тегом с префиксом `deploy-`:
+
+```bash
+git tag -a deploy-YYYY-MM-DD-N -m "Deploy YYYY-MM-DD N"
+git push origin main
+git push origin deploy-YYYY-MM-DD-N
+```
+
+Workflow подключается к VPS, обновляет `/opt/story-runner` до коммита из тега,
+пересобирает контейнер и проверяет `/healthz/`. Ручное обновление:
+
 ```bash
 docker compose down
 docker compose up --build -d

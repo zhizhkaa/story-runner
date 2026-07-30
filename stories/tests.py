@@ -224,6 +224,53 @@ class StoryRunnerTests(TestCase):
         self.assertEqual(claim.state, Claim.State.RELEASED)
         self.assertFalse(claim.items.exists())
 
+    def test_admin_can_delete_active_and_completed_runs(self):
+        active_run = self.make_run()
+        claim = create_claim(active_run, self.participant(), [active_run.nodes.get(code="1.1").id])
+        completed_run = self.make_run(StoryRun.OS.IOS)
+        completed_run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
+        finalize_if_ready(completed_run)
+
+        session = self.client.session
+        session["story_admin"] = True
+        session.save()
+
+        page = self.client.get(reverse("stories:manage_dashboard"))
+        self.assertContains(page, 'value="delete_run"', count=2)
+        self.assertContains(page, "Удалить прогон")
+        self.assertContains(page, "Это действие нельзя отменить")
+
+        response = self.client.post(
+            reverse("stories:manage_dashboard"),
+            {"action": "delete_run", "run_id": active_run.id},
+            follow=True,
+        )
+        self.assertContains(response, "Прогон «Android — 1.2.3 (456)» удалён.")
+        self.assertFalse(StoryRun.objects.filter(pk=active_run.pk).exists())
+        self.assertFalse(Claim.objects.filter(pk=claim.pk).exists())
+
+        response = self.client.post(
+            reverse("stories:manage_dashboard"),
+            {"action": "delete_run", "run_id": completed_run.id},
+        )
+        self.assertRedirects(response, reverse("stories:manage_dashboard"))
+        self.assertFalse(StoryRun.objects.filter(pk=completed_run.pk).exists())
+
+    def test_run_deletion_requires_admin_session(self):
+        run = self.make_run()
+
+        response = self.client.post(
+            reverse("stories:manage_dashboard"),
+            {"action": "delete_run", "run_id": run.id},
+        )
+
+        self.assertRedirects(
+            response,
+            f"{reverse('stories:manage_login')}?next={reverse('stories:manage_dashboard')}",
+            fetch_redirect_response=False,
+        )
+        self.assertTrue(StoryRun.objects.filter(pk=run.pk).exists())
+
     def test_participant_cookie_protects_claim(self):
         run = self.make_run()
         node = run.nodes.get(code="1.1")

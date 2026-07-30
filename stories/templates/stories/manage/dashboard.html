@@ -57,7 +57,10 @@
             {% endfor %}
           </div>
         </details>
-        <form method="post" class="mt-5 text-right">{% csrf_token %}<input type="hidden" name="action" value="force_complete"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50" type="submit" data-confirm="Досрочно завершить прогон со статусом «НЕ ОК»?">Завершить досрочно</button></form>
+        <div class="mt-5 flex flex-wrap justify-end gap-3">
+          <form method="post">{% csrf_token %}<input type="hidden" name="action" value="force_complete"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50" type="submit" data-confirm="Досрочно завершить прогон со статусом «НЕ ОК»?">Завершить досрочно</button></form>
+          <form method="post">{% csrf_token %}<input type="hidden" name="action" value="delete_run"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="rounded-xl bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800" type="submit" data-confirm="Удалить прогон и все связанные результаты? Это действие нельзя отменить.">Удалить прогон</button></form>
+        </div>
       </article>
     {% empty %}<div class="rounded-2xl border border-dashed border-zinc-300 px-6 py-12 text-center text-sm text-zinc-500">Активных прогонов нет</div>{% endfor %}
   </div>
@@ -66,7 +69,14 @@
 {% if recent_runs %}
 <section class="mt-14">
   <h2 class="text-2xl font-semibold tracking-tight">Недавние</h2>
-  <div class="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">{% for run in recent_runs %}<a class="flex flex-col gap-1 border-t border-zinc-100 px-5 py-4 text-sm transition first:border-t-0 hover:bg-zinc-50 sm:flex-row sm:items-center sm:justify-between" href="{% url 'stories:run_detail' run.public_id %}" target="_blank" rel="noopener"><span>{{ run.display_label }}</span><time class="text-zinc-400">{{ run.completed_at|date:'d.m.Y H:i' }}</time></a>{% endfor %}</div>
+  <div class="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+    {% for run in recent_runs %}
+      <div class="flex flex-col gap-3 border-t border-zinc-100 px-5 py-4 first:border-t-0 sm:flex-row sm:items-center">
+        <a class="flex min-w-0 flex-1 flex-col gap-1 text-sm transition hover:text-zinc-600 sm:flex-row sm:items-center sm:justify-between" href="{% url 'stories:run_detail' run.public_id %}" target="_blank" rel="noopener"><span>{{ run.display_label }}</span><time class="text-zinc-400">{{ run.completed_at|date:'d.m.Y H:i' }}</time></a>
+        <form method="post" class="shrink-0">{% csrf_token %}<input type="hidden" name="action" value="delete_run"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="text-sm font-medium text-red-600 hover:text-red-800" type="submit" data-confirm="Удалить прогон и все связанные результаты? Это действие нельзя отменить.">Удалить</button></form>
+      </div>
+    {% endfor %}
+  </div>
 </section>
 {% endif %}
 {% endblock %}
