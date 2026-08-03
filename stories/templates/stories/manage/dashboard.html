@@ -51,6 +51,7 @@
                   {% if row.visible_note %}<span class="text-xs leading-5 text-amber-700">⚠️ {{ row.visible_note }}</span>{% endif %}
                 </span>
                 {% if row.node.kind == 'check' %}
+                  {% if row.node.result_status or row.node.is_skipped %}<input class="h-4 w-4 shrink-0 cursor-pointer rounded border-zinc-300 text-blue-700 focus:ring-blue-500" type="checkbox" name="node_ids" value="{{ row.node.id }}" form="bulk-reset-{{ run.id }}" data-bulk-reset-box data-skipped="{% if row.node.is_skipped %}true{% else %}false{% endif %}" aria-label="Выбрать пункт {{ row.node.code }} для сброса">{% endif %}
                   <span class="shrink-0 text-xs {% if row.node.is_skipped %}font-medium text-amber-700{% else %}text-zinc-500{% endif %}">{% if row.node.result_status == 'ok' %}ОК ✅{% elif row.node.result_status == 'not_ok' %}НЕ ОК ❌{% elif row.node.is_skipped %}Пропуск{% elif row.claimed_by %}{{ row.claimed_by }}{% else %}Свободен{% endif %}</span>
                   {% if row.node.result_status or row.node.is_skipped %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="reset_node"><input type="hidden" name="node_id" value="{{ row.node.id }}"><button class="text-xs text-zinc-400 hover:text-red-600" type="submit" data-confirm="Сбросить результат пункта?">Сбросить</button></form>{% endif %}
                 {% endif %}
@@ -59,6 +60,13 @@
           </div>
         </details>
         <div class="mt-5 flex flex-wrap justify-end gap-3">
+          {% if run.done_count %}
+            <form id="bulk-reset-{{ run.id }}" method="post" class="flex flex-wrap items-center gap-2" data-bulk-reset-form>{% csrf_token %}<input type="hidden" name="action" value="bulk_reset_nodes"><input type="hidden" name="run_id" value="{{ run.id }}">
+              <button class="rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm font-medium hover:bg-zinc-50" type="button" data-bulk-select="all">Выбрать все</button>
+              <button class="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100" type="button" data-bulk-select="skipped">Выбрать пропуски</button>
+              <button class="rounded-xl bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40" type="submit" data-bulk-reset-submit data-label="Сбросить выбранные" data-confirm="Сбросить выбранные пункты? Они снова станут доступны участникам.">Сбросить выбранные</button>
+            </form>
+          {% endif %}
           {% if run.is_ready %}
             <details class="w-full rounded-xl border border-zinc-200 bg-zinc-50 sm:w-auto sm:min-w-[28rem]">
               <summary class="cursor-pointer list-none rounded-xl bg-zinc-950 px-4 py-2 text-center text-sm font-medium text-white hover:bg-zinc-800 [&::-webkit-details-marker]:hidden">Завершить</summary>

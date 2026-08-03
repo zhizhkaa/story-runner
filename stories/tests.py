@@ -11,6 +11,7 @@ from .services import (
     create_participant,
     create_run_from_template,
     reopen_run,
+    reset_run_nodes,
     run_result_rows,
     run_text,
     submit_claim,
@@ -302,6 +303,72 @@ class StoryRunnerTests(TestCase):
         completed.refresh_from_db()
         self.assertEqual(completed.state, StoryRun.State.COMPLETED)
         self.assertEqual(completed.final_status, ResultStatus.OK)
+
+    def test_admin_can_select_and_reset_multiple_results(self):
+        run = self.make_run()
+        skipped = run.nodes.get(code="1.1")
+        skipped.is_skipped = True
+        skipped.note = "Сервис недоступен"
+        skipped.completed_by_name = "Анна"
+        skipped.save(update_fields=["is_skipped", "note", "completed_by_name"])
+        SkipEvent.objects.create(node=skipped, participant_name="Анна", reason="Сервис недоступен")
+        failed = run.nodes.get(code="1.2")
+        failed.result_status = ResultStatus.NOT_OK
+        failed.note = "Ошибка"
+        failed.save(update_fields=["result_status", "note"])
+        untouched = run.nodes.get(code="1.3")
+        untouched.result_status = ResultStatus.OK
+        untouched.save(update_fields=["result_status"])
+        session = self.client.session
+        session["story_admin"] = True
+        session.save()
+
+        page = self.client.get(reverse("stories:manage_dashboard"))
+        self.assertContains(page, 'value="bulk_reset_nodes"')
+        self.assertContains(page, "Выбрать пропуски")
+        self.assertContains(page, "Сбросить выбранные")
+
+        response = self.client.post(
+            reverse("stories:manage_dashboard"),
+            {
+                "action": "bulk_reset_nodes",
+                "run_id": run.id,
+                "node_ids": [skipped.id, failed.id],
+            },
+            follow=True,
+        )
+
+        skipped.refresh_from_db()
+        failed.refresh_from_db()
+        untouched.refresh_from_db()
+        self.assertContains(response, "Сброшено пунктов: 2.")
+        self.assertFalse(skipped.is_skipped)
+        self.assertIsNone(skipped.result_status)
+        self.assertEqual(skipped.note, "")
+        self.assertIsNone(failed.result_status)
+        self.assertEqual(failed.note, "")
+        self.assertEqual(untouched.result_status, ResultStatus.OK)
+        self.assertTrue(SkipEvent.objects.filter(node=skipped, reason="Сервис недоступен").exists())
+
+    def test_bulk_reset_requires_selection_and_ignores_other_runs(self):
+        run = self.make_run()
+        other_run = self.make_run(StoryRun.OS.IOS)
+        other_node = other_run.nodes.get(code="1.1")
+        other_node.result_status = ResultStatus.NOT_OK
+        other_node.save(update_fields=["result_status"])
+        session = self.client.session
+        session["story_admin"] = True
+        session.save()
+
+        empty_response = self.client.post(
+            reverse("stories:manage_dashboard"),
+            {"action": "bulk_reset_nodes", "run_id": run.id},
+            follow=True,
+        )
+        self.assertContains(empty_response, "Выберите хотя бы один пункт.")
+        self.assertEqual(reset_run_nodes(run, [other_node.id]), 0)
+        other_node.refresh_from_db()
+        self.assertEqual(other_node.result_status, ResultStatus.NOT_OK)
 
     def test_admin_completion_button_appears_only_when_ready(self):
         run = self.make_run()

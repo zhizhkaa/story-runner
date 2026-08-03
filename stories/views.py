@@ -32,6 +32,7 @@ from .services import (
     create_run_from_template,
     release_claim,
     reopen_run,
+    reset_run_nodes,
     resolve_participant,
     run_result_rows,
     run_text,
@@ -454,6 +455,18 @@ def manage_dashboard(request):
             node.completed_at = None
             node.save(update_fields=["result_status", "is_skipped", "note", "completed_by_name", "completed_at"])
             messages.success(request, f"Пункт {node.code} снова доступен.")
+            return redirect("stories:manage_dashboard")
+        if action == "bulk_reset_nodes":
+            run = get_object_or_404(StoryRun, pk=request.POST.get("run_id"), state=StoryRun.State.ACTIVE)
+            node_ids = request.POST.getlist("node_ids")
+            if not node_ids:
+                messages.error(request, "Выберите хотя бы один пункт.")
+            else:
+                reset_count = reset_run_nodes(run, node_ids)
+                if reset_count:
+                    messages.success(request, f"Сброшено пунктов: {reset_count}.")
+                else:
+                    messages.error(request, "Выбранные пункты уже сброшены.")
             return redirect("stories:manage_dashboard")
 
     active_runs = list(StoryRun.objects.filter(state=StoryRun.State.ACTIVE).prefetch_related("claims__participant", "nodes"))

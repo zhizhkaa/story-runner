@@ -60,6 +60,32 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+document.querySelectorAll("[data-bulk-reset-form]").forEach((form) => {
+  const boxes = Array.from(document.querySelectorAll("[data-bulk-reset-box]"))
+    .filter((box) => box.form === form);
+  const submit = form.querySelector("[data-bulk-reset-submit]");
+
+  const updateSubmit = () => {
+    const selectedCount = boxes.filter((box) => box.checked).length;
+    submit.disabled = selectedCount === 0;
+    submit.textContent = selectedCount
+      ? `${submit.dataset.label} (${selectedCount})`
+      : submit.dataset.label;
+  };
+
+  boxes.forEach((box) => box.addEventListener("change", updateSubmit));
+  form.querySelectorAll("[data-bulk-select]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const skippedOnly = button.dataset.bulkSelect === "skipped";
+      boxes.forEach((box) => {
+        box.checked = !skippedOnly || box.dataset.skipped === "true";
+      });
+      updateSubmit();
+    });
+  });
+  updateSubmit();
+});
+
 document.querySelectorAll(".claim-tree").forEach((tree) => {
   const rows = Array.from(tree.querySelectorAll("[data-claim-depth]"));
 

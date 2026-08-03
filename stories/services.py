@@ -3,6 +3,7 @@ import secrets
 from collections import defaultdict
 
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from .models import (
@@ -239,6 +240,31 @@ def reopen_run(run):
     except IntegrityError as exc:
         raise ValueError(f"Для {run.get_os_display()} уже есть активный прогон") from exc
     return run
+
+
+@transaction.atomic
+def reset_run_nodes(run, node_ids):
+    run = StoryRun.objects.select_for_update().get(pk=run.pk)
+    if run.state != StoryRun.State.ACTIVE:
+        raise ValueError("Сначала откройте прогон обратно")
+    normalized_ids = []
+    for node_id in node_ids:
+        try:
+            normalized_ids.append(int(node_id))
+        except (TypeError, ValueError):
+            continue
+    nodes = (
+        RunNode.objects.select_for_update()
+        .filter(run=run, kind=NodeKind.CHECK, pk__in=normalized_ids)
+        .filter(Q(result_status__isnull=False) | Q(is_skipped=True))
+    )
+    return nodes.update(
+        result_status=None,
+        is_skipped=False,
+        note="",
+        completed_by_name="",
+        completed_at=None,
+    )
 
 
 def claimed_node_names(run):
