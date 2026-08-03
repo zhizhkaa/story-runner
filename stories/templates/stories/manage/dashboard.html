@@ -3,7 +3,7 @@
 {% block content %}
 <div class="flex flex-col gap-4 border-b border-zinc-200 pb-6 sm:flex-row sm:items-center sm:justify-between">
   <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">Управление</h1>
-  <a class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-medium hover:bg-zinc-50" href="{% url 'stories:manage_template' %}"><svg class="size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 20 4.2-1 10.5-10.5a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10-13 3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Редактировать шаблон</a>
+  <a class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-medium hover:bg-zinc-50" href="{% url 'stories:manage_template' %}"><i data-lucide="pencil" class="size-4" aria-hidden="true"></i>Редактировать шаблон</a>
 </div>
 
 <section class="mt-6 grid gap-4 lg:grid-cols-[2fr_1fr]">
@@ -14,7 +14,7 @@
       <label class="grid gap-1.5 text-sm text-zinc-600"><span>ОС</span><select class="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-zinc-950" name="os" required><option value="android">Android</option><option value="ios">iOS</option></select></label>
       <label class="grid gap-1.5 text-sm text-zinc-600"><span>Версия</span><input class="h-11 rounded-xl border border-zinc-300 px-3 text-zinc-950" name="version" maxlength="64" required placeholder="1.2.3"></label>
       <label class="grid gap-1.5 text-sm text-zinc-600"><span>Сборка</span><input class="h-11 rounded-xl border border-zinc-300 px-3 text-zinc-950" name="build" maxlength="64" required placeholder="456"></label>
-      <button class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white hover:bg-zinc-800" type="submit"><svg class="size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Создать</button>
+      <button class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white hover:bg-zinc-800" type="submit"><i data-lucide="plus" class="size-4" aria-hidden="true"></i>Создать</button>
     </form>
   </article>
   <a class="group flex min-h-40 flex-col rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300" href="{% url 'stories:manage_template' %}">
@@ -37,12 +37,12 @@
 
         {% if run.open_claims %}
           <div class="mt-5 divide-y divide-zinc-100 rounded-xl bg-zinc-50 px-4">
-            {% for claim in run.open_claims %}<div class="flex items-center justify-between gap-3 py-3 text-sm"><span>{{ claim.participant.display_name }} · {{ claim.items.count }} пунктов</span><form method="post">{% csrf_token %}<input type="hidden" name="action" value="release_claim"><input type="hidden" name="claim_id" value="{{ claim.id }}"><button class="grid size-8 place-items-center rounded-lg text-red-500 hover:bg-red-100 hover:text-red-700" type="submit" aria-label="Освободить назначение" title="Освободить назначение" data-confirm-title="Освободить назначение?" data-confirm="Пункты снова станут доступны другим участникам." data-confirm-action="Освободить"><svg class="size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 11V8a4 4 0 0 1 7.5-2M6 11h12v9H6v-9Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form></div>{% endfor %}
+            {% for claim in run.open_claims %}<div class="flex items-center justify-between gap-3 py-3 text-sm"><span>{{ claim.participant.display_name }} · {{ claim.items.count }} пунктов</span><form method="post">{% csrf_token %}<input type="hidden" name="action" value="release_claim"><input type="hidden" name="claim_id" value="{{ claim.id }}"><button class="grid size-8 place-items-center rounded-lg text-red-500 hover:bg-red-100 hover:text-red-700" type="submit" aria-label="Освободить назначение" title="Освободить назначение" data-confirm-title="Освободить назначение?" data-confirm="Пункты снова станут доступны другим участникам." data-confirm-action="Освободить"><i data-lucide="lock-open" class="size-4" aria-hidden="true"></i></button></form></div>{% endfor %}
           </div>
         {% endif %}
 
         <details class="group mt-5 rounded-xl border border-zinc-200">
-          <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden"><span>Пункты</span><svg class="details-chevron h-4 w-4 shrink-0 text-zinc-400 transition-transform" data-details-chevron viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden"><span>Пункты</span><i data-lucide="chevron-down" class="details-chevron size-4 shrink-0 text-zinc-400 transition-transform" data-details-chevron aria-hidden="true"></i></summary>
           <div class="border-t border-zinc-200">
             {% for row in run.tree_rows %}
               <div class="flex min-h-10 items-center gap-3 border-t border-zinc-100 px-4 py-2 text-sm first:border-t-0" style="padding-left: calc(1rem + {{ row.depth }} * 1.1rem)">
@@ -59,19 +59,19 @@
         </details>
         <div class="mt-5 flex flex-wrap items-center justify-end gap-2">
           {% if run.done_count %}
-            <button class="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50" type="button" data-dialog-open="reset-dialog-{{ run.id }}"><svg class="size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.5M4 4v4.5h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Сбросить пункты</button>
+            <button class="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50" type="button" data-dialog-open="reset-dialog-{{ run.id }}"><i data-lucide="rotate-ccw" class="size-4" aria-hidden="true"></i>Сбросить пункты</button>
           {% endif %}
           {% if run.is_ready %}
-            <button class="inline-flex items-center gap-2 rounded-xl bg-zinc-950 px-5 py-2 text-sm font-medium text-white hover:bg-zinc-800" type="button" data-dialog-open="complete-dialog-{{ run.id }}"><svg class="size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Завершить</button>
+            <button class="inline-flex items-center gap-2 rounded-xl bg-zinc-950 px-5 py-2 text-sm font-medium text-white hover:bg-zinc-800" type="button" data-dialog-open="complete-dialog-{{ run.id }}"><i data-lucide="check" class="size-4" aria-hidden="true"></i>Завершить</button>
           {% endif %}
-          <form method="post">{% csrf_token %}<input type="hidden" name="action" value="delete_run"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="grid size-10 place-items-center rounded-xl border border-red-200 bg-white text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-800" type="submit" aria-label="Удалить прогон" title="Удалить прогон" data-icon="delete" data-confirm-title="Удалить прогон?" data-confirm="Будут удалены все результаты и назначения. Это действие нельзя отменить." data-confirm-action="Удалить прогон" data-confirm-tone="danger"><svg class="size-5" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>
+          <form method="post">{% csrf_token %}<input type="hidden" name="action" value="delete_run"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="grid size-10 place-items-center rounded-xl border border-red-200 bg-white text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-800" type="submit" aria-label="Удалить прогон" title="Удалить прогон" data-icon="delete" data-confirm-title="Удалить прогон?" data-confirm="Будут удалены все результаты и назначения. Это действие нельзя отменить." data-confirm-action="Удалить прогон" data-confirm-tone="danger"><i data-lucide="trash-2" class="size-5" aria-hidden="true"></i></button></form>
         </div>
         {% if run.done_count %}
           <dialog id="reset-dialog-{{ run.id }}" class="m-auto max-h-[85vh] w-[min(42rem,calc(100%-2rem))] rounded-2xl border-0 bg-white p-0 text-zinc-950 shadow-2xl backdrop:bg-zinc-950/45 open:flex open:flex-col" data-dialog aria-labelledby="reset-dialog-title-{{ run.id }}">
             <form method="post" class="flex min-h-0 flex-1 flex-col" data-bulk-reset-form>{% csrf_token %}<input type="hidden" name="action" value="bulk_reset_nodes"><input type="hidden" name="run_id" value="{{ run.id }}">
               <header class="flex items-start justify-between gap-4 border-b border-zinc-200 px-5 py-4 sm:px-6">
                 <div><h4 id="reset-dialog-title-{{ run.id }}" class="text-lg font-semibold">Сбросить пункты</h4><p class="mt-1 text-sm text-zinc-500">Выбранные пункты снова станут доступны участникам.</p></div>
-                <button class="grid size-9 shrink-0 place-items-center rounded-lg text-2xl leading-none text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" type="button" data-dialog-close aria-label="Закрыть">×</button>
+                <button class="grid size-9 shrink-0 place-items-center rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" type="button" data-dialog-close aria-label="Закрыть"><i data-lucide="x" class="size-5" aria-hidden="true"></i></button>
               </header>
               <fieldset class="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4"><legend class="sr-only">Пункты для сброса</legend>
                 <div class="divide-y divide-zinc-100 overflow-hidden rounded-xl border border-zinc-200">
@@ -96,7 +96,7 @@
             <form method="post">{% csrf_token %}<input type="hidden" name="action" value="complete_run"><input type="hidden" name="run_id" value="{{ run.id }}">
               <header class="flex items-start justify-between gap-4 border-b border-zinc-200 px-5 py-4 sm:px-6">
                 <div><h4 id="complete-dialog-title-{{ run.id }}" class="text-lg font-semibold">Завершить прогон</h4><p class="mt-1 text-sm text-zinc-500">Выберите итоговый статус.</p></div>
-                <button class="grid size-9 shrink-0 place-items-center rounded-lg text-2xl leading-none text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" type="button" data-dialog-close aria-label="Закрыть">×</button>
+                <button class="grid size-9 shrink-0 place-items-center rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" type="button" data-dialog-close aria-label="Закрыть"><i data-lucide="x" class="size-5" aria-hidden="true"></i></button>
               </header>
               <div class="grid gap-4 px-5 py-5 sm:px-6">
                 <label class="grid gap-1.5 text-sm text-zinc-600"><span>Итоговый статус</span><select class="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-zinc-950" name="final_status" required><option value="ok">ОК</option><option value="not_ok">НЕ ОК</option></select></label>
@@ -121,8 +121,8 @@
     {% for run in recent_runs %}
       <div class="flex flex-col gap-3 border-t border-zinc-100 px-5 py-4 first:border-t-0 sm:flex-row sm:items-center">
         <a class="grid min-w-0 flex-1 gap-1 text-sm transition hover:text-zinc-600 sm:grid-cols-[1fr_auto] sm:items-center" href="{% url 'stories:run_detail' run.public_id %}" target="_blank" rel="noopener"><span>{{ run.display_label }}{% if run.final_comment %}<small class="mt-1 block font-normal text-zinc-500">{{ run.final_comment }}</small>{% endif %}</span><time class="text-zinc-400">{{ run.completed_at|date:'d.m.Y H:i' }}</time></a>
-        <form method="post" class="shrink-0">{% csrf_token %}<input type="hidden" name="action" value="reopen_run"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="grid size-9 place-items-center rounded-lg text-blue-600 hover:bg-blue-50 hover:text-blue-800" type="submit" aria-label="Открыть прогон обратно" title="Открыть прогон обратно" data-icon="reopen" data-confirm-title="Открыть прогон обратно?" data-confirm="Результаты пунктов сохранятся, а итоговый статус, комментарий и дата завершения будут очищены." data-confirm-action="Открыть обратно"><svg class="size-4.5" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>
-        <form method="post" class="shrink-0">{% csrf_token %}<input type="hidden" name="action" value="delete_run"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="grid size-9 place-items-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700" type="submit" aria-label="Удалить прогон" title="Удалить прогон" data-icon="delete" data-confirm-title="Удалить прогон?" data-confirm="Будут удалены все результаты и назначения. Это действие нельзя отменить." data-confirm-action="Удалить прогон" data-confirm-tone="danger"><svg class="size-4.5" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>
+        <form method="post" class="shrink-0">{% csrf_token %}<input type="hidden" name="action" value="reopen_run"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="grid size-9 place-items-center rounded-lg text-blue-600 hover:bg-blue-50 hover:text-blue-800" type="submit" aria-label="Открыть прогон обратно" title="Открыть прогон обратно" data-icon="reopen" data-confirm-title="Открыть прогон обратно?" data-confirm="Результаты пунктов сохранятся, а итоговый статус, комментарий и дата завершения будут очищены." data-confirm-action="Открыть обратно"><i data-lucide="rotate-cw" class="size-4.5" aria-hidden="true"></i></button></form>
+        <form method="post" class="shrink-0">{% csrf_token %}<input type="hidden" name="action" value="delete_run"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="grid size-9 place-items-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700" type="submit" aria-label="Удалить прогон" title="Удалить прогон" data-icon="delete" data-confirm-title="Удалить прогон?" data-confirm="Будут удалены все результаты и назначения. Это действие нельзя отменить." data-confirm-action="Удалить прогон" data-confirm-tone="danger"><i data-lucide="trash-2" class="size-4.5" aria-hidden="true"></i></button></form>
       </div>
     {% endfor %}
   </div>

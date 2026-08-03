@@ -6,7 +6,7 @@ RUN npm ci
 COPY assets ./assets
 COPY stories/templates ./stories/templates
 COPY stories/static/stories/app.js ./stories/static/stories/app.js
-RUN npm run css:build
+RUN npm run assets:build
 
 FROM python:3.13-slim
 
@@ -21,6 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 COPY --from=assets /app/stories/static/stories/styles.css /app/stories/static/stories/styles.css
+COPY --from=assets /app/stories/static/stories/lucide.min.js /app/stories/static/stories/lucide.min.js
 RUN mkdir -p /app/data /app/staticfiles && \
     chmod +x /app/entrypoint.sh && \
     DEBUG=0 SECRET_KEY=build-only-secret ADMIN_PASSWORD=build-only-password \

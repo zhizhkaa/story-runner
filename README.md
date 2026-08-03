@@ -57,11 +57,11 @@ uv pip install --python .venv/bin/python -r requirements.txt
 .venv/bin/python manage.py check
 ```
 
-Стили собираются Tailwind CSS CLI:
+Стили и локальная копия Lucide Icons собираются одной командой:
 
 ```bash
 npm ci
-npm run css:build
+npm run assets:build
 ```
 
 ## Основной сценарий

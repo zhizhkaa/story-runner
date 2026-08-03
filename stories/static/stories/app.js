@@ -1,8 +1,10 @@
 function flashButton(button, text) {
-  const original = button.textContent;
+  const original = button.innerHTML;
   button.textContent = text;
-  setTimeout(() => { button.textContent = original; }, 1500);
+  setTimeout(() => { button.innerHTML = original; }, 1500);
 }
+
+window.lucide?.createIcons();
 
 function escapedHtml(value) {
   return value

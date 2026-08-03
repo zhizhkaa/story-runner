@@ -275,6 +275,7 @@ class StoryRunnerTests(TestCase):
         self.assertContains(page, 'value="reopen_run"')
         self.assertContains(page, "Открыть обратно")
         self.assertContains(page, 'data-icon="reopen"')
+        self.assertContains(page, 'data-lucide="rotate-cw"')
         self.assertContains(page, 'aria-label="Открыть прогон обратно"')
 
         response = self.client.post(
@@ -331,6 +332,7 @@ class StoryRunnerTests(TestCase):
         self.assertContains(page, "Сбросить выбранные")
         self.assertContains(page, 'data-dialog-open="reset-dialog-')
         self.assertContains(page, "data-details-chevron")
+        self.assertContains(page, 'data-lucide="chevron-down"')
         self.assertNotContains(page, "Выбрать пропуски")
         self.assertNotContains(page, "Выбрать все")
 
@@ -427,6 +429,7 @@ class StoryRunnerTests(TestCase):
         self.assertContains(page, "Удалить прогон")
         self.assertContains(page, "Это действие нельзя отменить")
         self.assertContains(page, 'data-icon="delete"', count=2)
+        self.assertContains(page, 'data-lucide="trash-2"', count=2)
         self.assertContains(page, 'data-confirm-tone="danger"', count=2)
 
         response = self.client.post(
