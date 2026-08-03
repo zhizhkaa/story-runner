@@ -274,6 +274,8 @@ class StoryRunnerTests(TestCase):
         page = self.client.get(reverse("stories:manage_dashboard"))
         self.assertContains(page, 'value="reopen_run"')
         self.assertContains(page, "Открыть обратно")
+        self.assertContains(page, 'data-icon="reopen"')
+        self.assertContains(page, 'aria-label="Открыть прогон обратно"')
 
         response = self.client.post(
             reverse("stories:manage_dashboard"),
@@ -424,6 +426,8 @@ class StoryRunnerTests(TestCase):
         self.assertContains(page, 'value="delete_run"', count=2)
         self.assertContains(page, "Удалить прогон")
         self.assertContains(page, "Это действие нельзя отменить")
+        self.assertContains(page, 'data-icon="delete"', count=2)
+        self.assertContains(page, 'data-confirm-tone="danger"', count=2)
 
         response = self.client.post(
             reverse("stories:manage_dashboard"),

@@ -32,10 +32,44 @@ async function copyFormattedText(value) {
   await navigator.clipboard.writeText(value);
 }
 
+let pendingConfirmTarget = null;
+
+function openConfirmDialog(target) {
+  const dialog = document.getElementById("confirm-dialog");
+  const title = dialog?.querySelector("#confirm-dialog-title");
+  const body = dialog?.querySelector("#confirm-dialog-body");
+  const action = dialog?.querySelector("[data-confirm-dialog-action]");
+  if (!dialog || !title || !body || !action) return;
+
+  pendingConfirmTarget = target;
+  title.textContent = target.dataset.confirmTitle || target.getAttribute("aria-label") || "Подтвердить действие?";
+  body.textContent = target.dataset.confirm;
+  action.textContent = target.dataset.confirmAction || "Продолжить";
+  const danger = target.dataset.confirmTone === "danger";
+  action.className = danger
+    ? "rounded-xl bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800"
+    : "rounded-xl bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800";
+  dialog.showModal();
+}
+
 document.addEventListener("click", async (event) => {
   const confirmTarget = event.target.closest("[data-confirm]");
-  if (confirmTarget && !window.confirm(confirmTarget.dataset.confirm)) {
+  if (confirmTarget) {
     event.preventDefault();
+    openConfirmDialog(confirmTarget);
+    return;
+  }
+
+  const confirmAction = event.target.closest("[data-confirm-dialog-action]");
+  if (confirmAction) {
+    const target = pendingConfirmTarget;
+    pendingConfirmTarget = null;
+    confirmAction.closest("dialog")?.close();
+    if (target?.form) {
+      target.form.requestSubmit(target);
+    } else if (target?.href) {
+      window.location.assign(target.href);
+    }
     return;
   }
 
