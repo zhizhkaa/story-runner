@@ -186,7 +186,10 @@ def run_detail(request, public_id):
     assigned_count = run.claims.filter(state=Claim.State.OPEN).aggregate(
         total=Count("items")
     )["total"] or 0
-    share_version = f"{run.state}-{done_count}-{assigned_count}-{int((run.completed_at or run.created_at).timestamp())}"
+    share_version = (
+        f"{run.state}-{run.final_status or 'none'}-{done_count}-{assigned_count}-"
+        f"{int((run.completed_at or run.created_at).timestamp())}"
+    )
     detail_url = request.build_absolute_uri(reverse("stories:run_detail", args=[run.public_id]))
     share_url = f"{detail_url}?v={share_version}"
     preview_url = request.build_absolute_uri(reverse("stories:run_preview", args=[run.public_id]))
@@ -401,6 +404,16 @@ def manage_dashboard(request):
             force_complete(run)
             messages.success(request, "Прогон досрочно завершён со статусом «НЕ ОК».")
             return redirect("stories:manage_dashboard")
+        if action == "set_run_status":
+            run = get_object_or_404(StoryRun, pk=request.POST.get("run_id"), state=StoryRun.State.COMPLETED)
+            final_status = request.POST.get("final_status")
+            if final_status not in ResultStatus.values:
+                messages.error(request, "Выберите итоговый статус прогона.")
+            else:
+                run.final_status = final_status
+                run.save(update_fields=["final_status"])
+                messages.success(request, f"Итоговый статус изменён на «{run.get_final_status_display()}».")
+            return redirect("stories:manage_dashboard")
         if action == "delete_run":
             run = get_object_or_404(StoryRun, pk=request.POST.get("run_id"))
             run_label = run.display_label
@@ -432,7 +445,7 @@ def manage_dashboard(request):
         run.done_count, run.total_count = run.progress
         run.tree_rows = annotated_run_tree(run)
         run.open_claims = list(run.claims.filter(state=Claim.State.OPEN).select_related("participant"))
-    recent_runs = StoryRun.objects.filter(state=StoryRun.State.COMPLETED)[:10]
+    recent_runs = StoryRun.objects.filter(state=StoryRun.State.COMPLETED)
     return render(
         request,
         "stories/manage/dashboard.html",

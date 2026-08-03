@@ -224,6 +224,43 @@ class StoryRunnerTests(TestCase):
         self.assertEqual(claim.state, Claim.State.RELEASED)
         self.assertFalse(claim.items.exists())
 
+    def test_admin_can_override_completed_run_status(self):
+        run = self.make_run()
+        run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
+        finalize_if_ready(run)
+        run.refresh_from_db()
+        completed_at = run.completed_at
+        old_share_url = self.client.get(
+            reverse("stories:run_detail", args=[run.public_id])
+        ).context["share_url"]
+
+        session = self.client.session
+        session["story_admin"] = True
+        session.save()
+
+        response = self.client.post(
+            reverse("stories:manage_dashboard"),
+            {
+                "action": "set_run_status",
+                "run_id": run.id,
+                "final_status": ResultStatus.NOT_OK,
+            },
+            follow=True,
+        )
+
+        run.refresh_from_db()
+        self.assertContains(response, "Итоговый статус изменён на «НЕ ОК».")
+        self.assertEqual(run.state, StoryRun.State.COMPLETED)
+        self.assertEqual(run.final_status, ResultStatus.NOT_OK)
+        self.assertEqual(run.completed_at, completed_at)
+        self.assertContains(response, 'value="set_run_status"')
+        self.assertContains(response, '<option value="not_ok" selected>НЕ ОК</option>', html=True)
+        new_share_url = self.client.get(
+            reverse("stories:run_detail", args=[run.public_id])
+        ).context["share_url"]
+        self.assertNotEqual(old_share_url, new_share_url)
+        self.assertIn("completed-not_ok", new_share_url)
+
     def test_admin_can_delete_active_and_completed_runs(self):
         active_run = self.make_run()
         claim = create_claim(active_run, self.participant(), [active_run.nodes.get(code="1.1").id])

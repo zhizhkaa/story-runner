@@ -68,11 +68,20 @@
 
 {% if recent_runs %}
 <section class="mt-14">
-  <h2 class="text-2xl font-semibold tracking-tight">Недавние</h2>
+  <h2 class="text-2xl font-semibold tracking-tight">Завершённые</h2>
   <div class="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
     {% for run in recent_runs %}
       <div class="flex flex-col gap-3 border-t border-zinc-100 px-5 py-4 first:border-t-0 sm:flex-row sm:items-center">
         <a class="flex min-w-0 flex-1 flex-col gap-1 text-sm transition hover:text-zinc-600 sm:flex-row sm:items-center sm:justify-between" href="{% url 'stories:run_detail' run.public_id %}" target="_blank" rel="noopener"><span>{{ run.display_label }}</span><time class="text-zinc-400">{{ run.completed_at|date:'d.m.Y H:i' }}</time></a>
+        <form method="post" class="flex shrink-0 items-center gap-2">
+          {% csrf_token %}<input type="hidden" name="action" value="set_run_status"><input type="hidden" name="run_id" value="{{ run.id }}">
+          <label class="sr-only" for="run-status-{{ run.id }}">Итоговый статус {{ run.get_os_display }} {{ run.version }}</label>
+          <select id="run-status-{{ run.id }}" class="h-9 rounded-lg border border-zinc-300 bg-white px-2 text-sm text-zinc-950" name="final_status">
+            <option value="ok" {% if run.final_status == 'ok' %}selected{% endif %}>ОК</option>
+            <option value="not_ok" {% if run.final_status == 'not_ok' %}selected{% endif %}>НЕ ОК</option>
+          </select>
+          <button class="h-9 rounded-lg border border-zinc-300 bg-white px-3 text-sm font-medium hover:bg-zinc-50" type="submit">Сохранить</button>
+        </form>
         <form method="post" class="shrink-0">{% csrf_token %}<input type="hidden" name="action" value="delete_run"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="text-sm font-medium text-red-600 hover:text-red-800" type="submit" data-confirm="Удалить прогон и все связанные результаты? Это действие нельзя отменить.">Удалить</button></form>
       </div>
     {% endfor %}
