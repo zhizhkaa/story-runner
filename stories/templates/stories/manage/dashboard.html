@@ -83,6 +83,7 @@
     {% for run in recent_runs %}
       <div class="flex flex-col gap-3 border-t border-zinc-100 px-5 py-4 first:border-t-0 sm:flex-row sm:items-center">
         <a class="grid min-w-0 flex-1 gap-1 text-sm transition hover:text-zinc-600 sm:grid-cols-[1fr_auto] sm:items-center" href="{% url 'stories:run_detail' run.public_id %}" target="_blank" rel="noopener"><span>{{ run.display_label }}{% if run.final_comment %}<small class="mt-1 block font-normal text-zinc-500">{{ run.final_comment }}</small>{% endif %}</span><time class="text-zinc-400">{{ run.completed_at|date:'d.m.Y H:i' }}</time></a>
+        <form method="post" class="shrink-0">{% csrf_token %}<input type="hidden" name="action" value="reopen_run"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="text-sm font-medium text-blue-700 hover:text-blue-900" type="submit" data-confirm="Открыть прогон снова? Результаты пунктов сохранятся, а итоговый статус и комментарий будут удалены.">Открыть обратно</button></form>
         <form method="post" class="shrink-0">{% csrf_token %}<input type="hidden" name="action" value="delete_run"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="text-sm font-medium text-red-600 hover:text-red-800" type="submit" data-confirm="Удалить прогон и все связанные результаты? Это действие нельзя отменить.">Удалить</button></form>
       </div>
     {% endfor %}

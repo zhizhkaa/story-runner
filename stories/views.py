@@ -31,6 +31,7 @@ from .services import (
     create_participant,
     create_run_from_template,
     release_claim,
+    reopen_run,
     resolve_participant,
     run_result_rows,
     run_text,
@@ -418,6 +419,15 @@ def manage_dashboard(request):
                 messages.error(request, str(exc))
             else:
                 messages.success(request, "Прогон завершён.")
+            return redirect("stories:manage_dashboard")
+        if action == "reopen_run":
+            run = get_object_or_404(StoryRun, pk=request.POST.get("run_id"), state=StoryRun.State.COMPLETED)
+            try:
+                reopen_run(run)
+            except ValueError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(request, "Прогон снова открыт.")
             return redirect("stories:manage_dashboard")
         if action == "delete_run":
             run = get_object_or_404(StoryRun, pk=request.POST.get("run_id"))

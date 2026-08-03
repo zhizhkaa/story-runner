@@ -10,6 +10,7 @@ from .services import (
     create_claim,
     create_participant,
     create_run_from_template,
+    reopen_run,
     run_result_rows,
     run_text,
     submit_claim,
@@ -258,6 +259,49 @@ class StoryRunnerTests(TestCase):
         self.assertNotContains(response, 'value="set_run_status"')
         with self.assertRaisesMessage(ValueError, "уже завершён"):
             complete_run(run, ResultStatus.NOT_OK)
+
+    def test_admin_can_reopen_completed_run_without_resetting_results(self):
+        run = self.make_run()
+        run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
+        complete_run(run, ResultStatus.NOT_OK, "Нужно перепроверить")
+        run.refresh_from_db()
+        completed_at = run.completed_at
+        session = self.client.session
+        session["story_admin"] = True
+        session.save()
+
+        page = self.client.get(reverse("stories:manage_dashboard"))
+        self.assertContains(page, 'value="reopen_run"')
+        self.assertContains(page, "Открыть обратно")
+
+        response = self.client.post(
+            reverse("stories:manage_dashboard"),
+            {"action": "reopen_run", "run_id": run.id},
+            follow=True,
+        )
+
+        run.refresh_from_db()
+        self.assertContains(response, "Прогон снова открыт.")
+        self.assertEqual(run.state, StoryRun.State.ACTIVE)
+        self.assertIsNone(run.final_status)
+        self.assertEqual(run.final_comment, "")
+        self.assertIsNone(run.completed_at)
+        self.assertIsNotNone(completed_at)
+        self.assertEqual(run.nodes.filter(kind=NodeKind.CHECK, result_status=ResultStatus.OK).count(), 95)
+        self.assertTrue(run.is_ready)
+
+    def test_completed_run_cannot_reopen_while_same_os_is_active(self):
+        completed = self.make_run()
+        completed.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
+        complete_run(completed, ResultStatus.OK)
+        self.make_run(build="789")
+
+        with self.assertRaisesMessage(ValueError, "Для Android уже есть активный прогон"):
+            reopen_run(completed)
+
+        completed.refresh_from_db()
+        self.assertEqual(completed.state, StoryRun.State.COMPLETED)
+        self.assertEqual(completed.final_status, ResultStatus.OK)
 
     def test_admin_completion_button_appears_only_when_ready(self):
         run = self.make_run()

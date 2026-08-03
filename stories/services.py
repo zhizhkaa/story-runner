@@ -217,6 +217,30 @@ def complete_run(run, final_status, final_comment=""):
     return run
 
 
+@transaction.atomic
+def reopen_run(run):
+    run = StoryRun.objects.select_for_update().get(pk=run.pk)
+    if run.state != StoryRun.State.COMPLETED:
+        raise ValueError("Прогон уже активен")
+    if (
+        StoryRun.objects.select_for_update()
+        .filter(os=run.os, state=StoryRun.State.ACTIVE)
+        .exclude(pk=run.pk)
+        .exists()
+    ):
+        raise ValueError(f"Для {run.get_os_display()} уже есть активный прогон")
+    run.final_status = None
+    run.final_comment = ""
+    run.forced = False
+    run.state = StoryRun.State.ACTIVE
+    run.completed_at = None
+    try:
+        run.save(update_fields=["final_status", "final_comment", "forced", "state", "completed_at"])
+    except IntegrityError as exc:
+        raise ValueError(f"Для {run.get_os_display()} уже есть активный прогон") from exc
+    return run
+
+
 def claimed_node_names(run):
     return {
         item.node_id: item.claim.participant.display_name
