@@ -39,6 +39,20 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  const dialogOpen = event.target.closest("[data-reset-dialog-open]");
+  if (dialogOpen) {
+    const dialog = document.getElementById(dialogOpen.dataset.resetDialogOpen);
+    dialog?.querySelector("form")?.reset();
+    dialog?.showModal();
+    return;
+  }
+
+  const dialogClose = event.target.closest("[data-reset-dialog-close]");
+  if (dialogClose) {
+    dialogClose.closest("dialog")?.close();
+    return;
+  }
+
   const copyText = event.target.closest(".copy-text");
   if (copyText) {
     const target = document.getElementById(copyText.dataset.copyTarget);
@@ -74,16 +88,14 @@ document.querySelectorAll("[data-bulk-reset-form]").forEach((form) => {
   };
 
   boxes.forEach((box) => box.addEventListener("change", updateSubmit));
-  form.querySelectorAll("[data-bulk-select]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const skippedOnly = button.dataset.bulkSelect === "skipped";
-      boxes.forEach((box) => {
-        box.checked = !skippedOnly || box.dataset.skipped === "true";
-      });
-      updateSubmit();
-    });
-  });
+  form.addEventListener("reset", () => window.setTimeout(updateSubmit));
   updateSubmit();
+});
+
+document.querySelectorAll("[data-reset-dialog]").forEach((dialog) => {
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
 });
 
 document.querySelectorAll(".claim-tree").forEach((tree) => {

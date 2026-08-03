@@ -15,4 +15,8 @@
   textarea {
     tab-size: 2;
   }
+
+  details[open] > summary .details-chevron {
+    transform: rotate(180deg);
+  }
 }

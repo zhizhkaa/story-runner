@@ -41,8 +41,8 @@
           </div>
         {% endif %}
 
-        <details class="mt-5 rounded-xl border border-zinc-200">
-          <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">Пункты</summary>
+        <details class="group mt-5 rounded-xl border border-zinc-200">
+          <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden"><span>Пункты</span><svg class="details-chevron h-4 w-4 shrink-0 text-zinc-400 transition-transform" data-details-chevron viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
           <div class="border-t border-zinc-200">
             {% for row in run.tree_rows %}
               <div class="flex min-h-10 items-center gap-3 border-t border-zinc-100 px-4 py-2 text-sm first:border-t-0" style="padding-left: calc(1rem + {{ row.depth }} * 1.1rem)">
@@ -51,9 +51,7 @@
                   {% if row.visible_note %}<span class="text-xs leading-5 text-amber-700">⚠️ {{ row.visible_note }}</span>{% endif %}
                 </span>
                 {% if row.node.kind == 'check' %}
-                  {% if row.node.result_status or row.node.is_skipped %}<input class="h-4 w-4 shrink-0 cursor-pointer rounded border-zinc-300 text-blue-700 focus:ring-blue-500" type="checkbox" name="node_ids" value="{{ row.node.id }}" form="bulk-reset-{{ run.id }}" data-bulk-reset-box data-skipped="{% if row.node.is_skipped %}true{% else %}false{% endif %}" aria-label="Выбрать пункт {{ row.node.code }} для сброса">{% endif %}
                   <span class="shrink-0 text-xs {% if row.node.is_skipped %}font-medium text-amber-700{% else %}text-zinc-500{% endif %}">{% if row.node.result_status == 'ok' %}ОК ✅{% elif row.node.result_status == 'not_ok' %}НЕ ОК ❌{% elif row.node.is_skipped %}Пропуск{% elif row.claimed_by %}{{ row.claimed_by }}{% else %}Свободен{% endif %}</span>
-                  {% if row.node.result_status or row.node.is_skipped %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="reset_node"><input type="hidden" name="node_id" value="{{ row.node.id }}"><button class="text-xs text-zinc-400 hover:text-red-600" type="submit" data-confirm="Сбросить результат пункта?">Сбросить</button></form>{% endif %}
                 {% endif %}
               </div>
             {% endfor %}
@@ -61,11 +59,7 @@
         </details>
         <div class="mt-5 flex flex-wrap justify-end gap-3">
           {% if run.done_count %}
-            <form id="bulk-reset-{{ run.id }}" method="post" class="flex flex-wrap items-center gap-2" data-bulk-reset-form>{% csrf_token %}<input type="hidden" name="action" value="bulk_reset_nodes"><input type="hidden" name="run_id" value="{{ run.id }}">
-              <button class="rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm font-medium hover:bg-zinc-50" type="button" data-bulk-select="all">Выбрать все</button>
-              <button class="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100" type="button" data-bulk-select="skipped">Выбрать пропуски</button>
-              <button class="rounded-xl bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40" type="submit" data-bulk-reset-submit data-label="Сбросить выбранные" data-confirm="Сбросить выбранные пункты? Они снова станут доступны участникам.">Сбросить выбранные</button>
-            </form>
+            <button class="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50" type="button" data-reset-dialog-open="reset-dialog-{{ run.id }}">Сбросить пункты</button>
           {% endif %}
           {% if run.is_ready %}
             <details class="w-full rounded-xl border border-zinc-200 bg-zinc-50 sm:w-auto sm:min-w-[28rem]">
@@ -79,6 +73,31 @@
           {% endif %}
           <form method="post">{% csrf_token %}<input type="hidden" name="action" value="delete_run"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="rounded-xl bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800" type="submit" data-confirm="Удалить прогон и все связанные результаты? Это действие нельзя отменить.">Удалить прогон</button></form>
         </div>
+        {% if run.done_count %}
+          <dialog id="reset-dialog-{{ run.id }}" class="m-auto max-h-[85vh] w-[min(42rem,calc(100%-2rem))] rounded-2xl border-0 bg-white p-0 text-zinc-950 shadow-2xl backdrop:bg-zinc-950/45 open:flex open:flex-col" data-reset-dialog aria-labelledby="reset-dialog-title-{{ run.id }}">
+            <form method="post" class="flex min-h-0 flex-1 flex-col" data-bulk-reset-form>{% csrf_token %}<input type="hidden" name="action" value="bulk_reset_nodes"><input type="hidden" name="run_id" value="{{ run.id }}">
+              <header class="flex items-start justify-between gap-4 border-b border-zinc-200 px-5 py-4 sm:px-6">
+                <div><h4 id="reset-dialog-title-{{ run.id }}" class="text-lg font-semibold">Сбросить пункты</h4><p class="mt-1 text-sm text-zinc-500">Выбранные пункты снова станут доступны участникам.</p></div>
+                <button class="grid size-9 shrink-0 place-items-center rounded-lg text-2xl leading-none text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" type="button" data-reset-dialog-close aria-label="Закрыть">×</button>
+              </header>
+              <fieldset class="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4"><legend class="sr-only">Пункты для сброса</legend>
+                <div class="divide-y divide-zinc-100 overflow-hidden rounded-xl border border-zinc-200">
+                  {% for row in run.tree_rows %}{% if row.node.kind == 'check' and row.node.result_status or row.node.kind == 'check' and row.node.is_skipped %}
+                    <label class="flex cursor-pointer items-start gap-3 px-4 py-3 text-sm hover:bg-zinc-50">
+                      <input class="mt-0.5 size-4 shrink-0 rounded border-zinc-300 text-blue-700 focus:ring-blue-500" type="checkbox" name="node_ids" value="{{ row.node.id }}" data-bulk-reset-box>
+                      <span class="grid min-w-0 flex-1 gap-1"><span><strong>{{ row.node.code }}</strong> {{ row.node.title }}</span>{% if row.visible_note %}<span class="text-xs text-amber-700">⚠️ {{ row.visible_note }}</span>{% endif %}</span>
+                      <span class="shrink-0 text-xs font-medium {% if row.node.result_status == 'not_ok' %}text-red-700{% elif row.node.is_skipped %}text-amber-700{% else %}text-emerald-700{% endif %}">{% if row.node.result_status == 'ok' %}ОК ✅{% elif row.node.result_status == 'not_ok' %}НЕ ОК ❌{% else %}Пропуск{% endif %}</span>
+                    </label>
+                  {% endif %}{% endfor %}
+                </div>
+              </fieldset>
+              <footer class="flex flex-col-reverse gap-2 border-t border-zinc-200 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+                <button class="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50" type="button" data-reset-dialog-close>Отмена</button>
+                <button class="rounded-xl bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40" type="submit" data-bulk-reset-submit data-label="Сбросить выбранные" disabled>Сбросить выбранные</button>
+              </footer>
+            </form>
+          </dialog>
+        {% endif %}
       </article>
     {% empty %}<div class="rounded-2xl border border-dashed border-zinc-300 px-6 py-12 text-center text-sm text-zinc-500">Активных прогонов нет</div>{% endfor %}
   </div>

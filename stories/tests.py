@@ -325,8 +325,12 @@ class StoryRunnerTests(TestCase):
 
         page = self.client.get(reverse("stories:manage_dashboard"))
         self.assertContains(page, 'value="bulk_reset_nodes"')
-        self.assertContains(page, "Выбрать пропуски")
+        self.assertContains(page, "Сбросить пункты")
         self.assertContains(page, "Сбросить выбранные")
+        self.assertContains(page, "data-reset-dialog")
+        self.assertContains(page, "data-details-chevron")
+        self.assertNotContains(page, "Выбрать пропуски")
+        self.assertNotContains(page, "Выбрать все")
 
         response = self.client.post(
             reverse("stories:manage_dashboard"),
@@ -499,6 +503,12 @@ class StoryRunnerTests(TestCase):
         self.assertContains(response, "Android — 1.2.3 (123)")
         self.assertNotContains(response, "Android · 1.2.3 · 123")
         self.assertContains(response, 'class="claim-row', count=run.nodes.count())
+        first_check = run.nodes.filter(kind=NodeKind.CHECK).first()
+        html = response.content.decode()
+        marker = f'value="{first_check.id}"'
+        row_start = html.rfind("<label", 0, html.index(marker))
+        row_end = html.index("</label>", html.index(marker))
+        self.assertNotIn("Свободно 1 из 1", html[row_start:row_end])
 
     @override_settings(ADMIN_PASSWORD="secret")
     def test_management_requires_password_and_csrf(self):
