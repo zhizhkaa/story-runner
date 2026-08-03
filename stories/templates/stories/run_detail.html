@@ -30,6 +30,7 @@
 </div>
 {% if run.final_comment %}<p class="mt-5 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900"><strong>Комментарий:</strong> {{ run.final_comment }}</p>{% endif %}
 <div class="mt-5 flex flex-wrap gap-2">
+  {% if run.state == 'active' and not run.is_ready %}<a class="inline-flex items-center rounded-lg bg-zinc-950 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800" href="{% url 'stories:claim_select' run.public_id %}">Взять в работу</a>{% endif %}
   <button class="copy-text rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium hover:bg-zinc-50" type="button" data-copy-target="story-text">Скопировать текст</button>
   <button class="copy-current-link rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium hover:bg-zinc-50" type="button" data-copy-url="{{ share_url }}">Скопировать ссылку</button>
 </div>
