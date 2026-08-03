@@ -4,7 +4,7 @@
   "scripts": {
     "css:build": "tailwindcss -i ./assets/tailwind.css -o ./stories/static/stories/styles.css --minify",
     "css:watch": "tailwindcss -i ./assets/tailwind.css -o ./stories/static/stories/styles.css --watch",
-    "icons:build": "cp ./node_modules/lucide/dist/umd/lucide.min.js ./stories/static/stories/lucide.min.js",
+    "icons:build": "cp ./node_modules/lucide/dist/umd/lucide.min.js ./node_modules/lucide/dist/umd/lucide.min.js.map ./stories/static/stories/",
     "assets:build": "npm run css:build && npm run icons:build"
   },
   "devDependencies": {

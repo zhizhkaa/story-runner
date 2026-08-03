@@ -10,3 +10,4 @@ staticfiles/
 .pytest_cache/
 node_modules/
 stories/static/stories/lucide.min.js
+stories/static/stories/lucide.min.js.map
