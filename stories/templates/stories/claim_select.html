@@ -22,7 +22,7 @@
           {% if row.visible_note %}<span class="text-xs leading-5 text-amber-700">⚠️ {{ row.visible_note }}</span>{% endif %}
         </span>
         <span class="col-start-2 text-xs text-zinc-400 sm:col-start-auto">
-          {% if row.node.kind == 'check' and row.claimed_by %}Взял {{ row.claimed_by }}{% elif row.node.kind == 'check' and row.node.result_status %}Готово{% elif row.node.kind == 'check' and row.was_skipped %}<span class="font-medium text-amber-700">Пропуск</span>{% else %}Свободно {{ row.free }} из {{ row.total }}{% endif %}
+          {% if row.node.kind == 'check' and row.node.result_status %}Готово{% elif row.node.kind == 'check' and row.node.is_skipped %}<span class="font-medium text-amber-700">Пропуск</span>{% elif row.node.kind == 'check' and row.claimed_by %}Взял {{ row.claimed_by }}{% else %}Свободно {{ row.free }} из {{ row.total }}{% endif %}
         </span>
       </label>
     {% endfor %}

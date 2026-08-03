@@ -56,6 +56,7 @@ class StoryRun(models.Model):
     build = models.CharField(max_length=64)
     state = models.CharField(max_length=12, choices=State.choices, default=State.ACTIVE)
     final_status = models.CharField(max_length=10, choices=ResultStatus.choices, null=True, blank=True)
+    final_comment = models.TextField(blank=True)
     forced = models.BooleanField(default=False)
     template_name = models.CharField(max_length=200)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -73,7 +74,7 @@ class StoryRun(models.Model):
 
     @property
     def has_notes(self):
-        return self.nodes.filter(kind=NodeKind.CHECK).exclude(note="").exists()
+        return bool(self.final_comment.strip()) or self.nodes.filter(kind=NodeKind.CHECK).exclude(note="").exists()
 
     @property
     def has_skips(self):
@@ -86,7 +87,7 @@ class StoryRun(models.Model):
     @property
     def status_label(self):
         if self.state == self.State.ACTIVE:
-            return "АКТИВЕН"
+            return "ОЖИДАЕТ ЗАВЕРШЕНИЯ" if self.is_ready else "АКТИВЕН"
         label = "ОК ✅" if self.final_status == ResultStatus.OK else "НЕ ОК ❌"
         return f"{label} ⚠️" if self.has_warnings else label
 
@@ -94,7 +95,7 @@ class StoryRun(models.Model):
     def display_label(self):
         base = f"{self.get_os_display()} — {self.version} ({self.build})"
         if self.state == self.State.ACTIVE:
-            return base
+            return f"⏳ {base}" if self.is_ready else base
         status_icon = "✅" if self.final_status == ResultStatus.OK else "❌"
         warning = " ⚠️" if self.has_warnings else ""
         return f"{status_icon}{warning} {base}"
@@ -102,7 +103,15 @@ class StoryRun(models.Model):
     @property
     def progress(self):
         checks = self.nodes.filter(kind=NodeKind.CHECK)
-        return checks.exclude(result_status__isnull=True).count(), checks.count()
+        done = checks.filter(Q(result_status__isnull=False) | Q(is_skipped=True)).count()
+        return done, checks.count()
+
+    @property
+    def is_ready(self):
+        if self.state != self.State.ACTIVE:
+            return False
+        done, total = self.progress
+        return total > 0 and done == total
 
     def __str__(self):
         return self.display_label
@@ -117,6 +126,7 @@ class RunNode(models.Model):
     kind = models.CharField(max_length=10, choices=NodeKind.choices)
     position = models.PositiveIntegerField(default=0)
     result_status = models.CharField(max_length=10, choices=ResultStatus.choices, null=True, blank=True)
+    is_skipped = models.BooleanField(default=False)
     note = models.TextField(blank=True)
     completed_by_name = models.CharField(max_length=80, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)

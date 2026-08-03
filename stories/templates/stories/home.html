@@ -15,6 +15,7 @@
           <span class="text-sm text-zinc-500">Сборка {{ run.build }}</span>
         </div>
         <h2 class="mt-6 text-3xl font-semibold tracking-tight">{{ run.version }}</h2>
+        {% if run.is_ready %}<p class="mt-2 text-sm font-medium text-amber-700">Ожидает завершения</p>{% endif %}
         <div class="mt-5 flex items-center gap-3">
           <div class="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100"><div class="h-full rounded-full bg-emerald-600" style="width: {% widthratio run.done_count run.total_count 100 %}%"></div></div>
           <span class="text-sm tabular-nums text-zinc-500">{{ run.done_count }}/{{ run.total_count }}</span>
@@ -23,7 +24,7 @@
         <div class="mt-6 flex flex-col gap-2 sm:flex-row">
           {% for claim in run.my_claims %}<a class="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-medium transition hover:bg-zinc-50" href="{% url 'stories:claim_work' claim.public_id %}">Продолжить</a>{% endfor %}
           <a class="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-medium transition hover:bg-zinc-50" href="{% url 'stories:run_detail' run.public_id %}">Состояние</a>
-          <a class="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800" href="{% url 'stories:claim_select' run.public_id %}">Взять пункты</a>
+          {% if not run.is_ready %}<a class="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800" href="{% url 'stories:claim_select' run.public_id %}">Взять пункты</a>{% endif %}
         </div>
       </article>
     {% empty %}
@@ -59,6 +60,7 @@
               <span class="text-zinc-400 transition group-open:rotate-180" aria-hidden="true">⌄</span>
             </summary>
             <div class="border-t border-zinc-100 bg-zinc-50/60 p-4 sm:p-5">
+              {% if run.final_comment %}<p class="mb-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900"><strong>Комментарий:</strong> {{ run.final_comment }}</p>{% endif %}
               <div class="mb-3 flex flex-wrap gap-2">
                 <button class="copy-text rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium transition hover:bg-zinc-50" type="button" data-copy-target="run-text-{{ run.id }}">Скопировать текст</button>
                 <button class="copy-link rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium transition hover:bg-zinc-50" type="button" data-copy-url="{% url 'stories:run_detail' run.public_id %}">Скопировать ссылку</button>

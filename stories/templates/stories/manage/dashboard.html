@@ -33,6 +33,7 @@
           <strong class="text-sm tabular-nums text-zinc-500">{{ run.done_count }}/{{ run.total_count }}</strong>
         </header>
         <div class="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100"><div class="h-full rounded-full bg-emerald-600" style="width: {% widthratio run.done_count run.total_count 100 %}%"></div></div>
+        {% if run.is_ready %}<p class="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">Все пункты заполнены. Прогон ожидает завершения.</p>{% endif %}
 
         {% if run.open_claims %}
           <div class="mt-5 divide-y divide-zinc-100 rounded-xl bg-zinc-50 px-4">
@@ -50,15 +51,24 @@
                   {% if row.visible_note %}<span class="text-xs leading-5 text-amber-700">⚠️ {{ row.visible_note }}</span>{% endif %}
                 </span>
                 {% if row.node.kind == 'check' %}
-                  <span class="shrink-0 text-xs {% if row.was_skipped and not row.node.result_status and not row.claimed_by %}font-medium text-amber-700{% else %}text-zinc-500{% endif %}">{% if row.node.result_status == 'ok' %}ОК ✅{% elif row.node.result_status == 'not_ok' %}НЕ ОК ❌{% elif row.claimed_by %}{{ row.claimed_by }}{% elif row.was_skipped %}Пропуск{% else %}Свободен{% endif %}</span>
-                  {% if row.node.result_status %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="reset_node"><input type="hidden" name="node_id" value="{{ row.node.id }}"><button class="text-xs text-zinc-400 hover:text-red-600" type="submit" data-confirm="Сбросить результат пункта?">Сбросить</button></form>{% endif %}
+                  <span class="shrink-0 text-xs {% if row.node.is_skipped %}font-medium text-amber-700{% else %}text-zinc-500{% endif %}">{% if row.node.result_status == 'ok' %}ОК ✅{% elif row.node.result_status == 'not_ok' %}НЕ ОК ❌{% elif row.node.is_skipped %}Пропуск{% elif row.claimed_by %}{{ row.claimed_by }}{% else %}Свободен{% endif %}</span>
+                  {% if row.node.result_status or row.node.is_skipped %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="reset_node"><input type="hidden" name="node_id" value="{{ row.node.id }}"><button class="text-xs text-zinc-400 hover:text-red-600" type="submit" data-confirm="Сбросить результат пункта?">Сбросить</button></form>{% endif %}
                 {% endif %}
               </div>
             {% endfor %}
           </div>
         </details>
         <div class="mt-5 flex flex-wrap justify-end gap-3">
-          <form method="post">{% csrf_token %}<input type="hidden" name="action" value="force_complete"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50" type="submit" data-confirm="Досрочно завершить прогон со статусом «НЕ ОК»?">Завершить досрочно</button></form>
+          {% if run.is_ready %}
+            <details class="w-full rounded-xl border border-zinc-200 bg-zinc-50 sm:w-auto sm:min-w-[28rem]">
+              <summary class="cursor-pointer list-none rounded-xl bg-zinc-950 px-4 py-2 text-center text-sm font-medium text-white hover:bg-zinc-800 [&::-webkit-details-marker]:hidden">Завершить</summary>
+              <form method="post" class="grid gap-3 p-4">{% csrf_token %}<input type="hidden" name="action" value="complete_run"><input type="hidden" name="run_id" value="{{ run.id }}">
+                <label class="grid gap-1.5 text-sm text-zinc-600"><span>Итоговый статус</span><select class="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-zinc-950" name="final_status" required><option value="ok">ОК</option><option value="not_ok">НЕ ОК</option></select></label>
+                <label class="grid gap-1.5 text-sm text-zinc-600"><span>Комментарий <span class="text-zinc-400">(необязательно)</span></span><textarea class="min-h-20 resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-950" name="final_comment" placeholder="Комментарий к итоговому статусу"></textarea></label>
+                <button class="h-10 rounded-lg bg-zinc-950 px-4 text-sm font-medium text-white hover:bg-zinc-800" type="submit">Подтвердить завершение</button>
+              </form>
+            </details>
+          {% endif %}
           <form method="post">{% csrf_token %}<input type="hidden" name="action" value="delete_run"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="rounded-xl bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800" type="submit" data-confirm="Удалить прогон и все связанные результаты? Это действие нельзя отменить.">Удалить прогон</button></form>
         </div>
       </article>
@@ -72,16 +82,7 @@
   <div class="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
     {% for run in recent_runs %}
       <div class="flex flex-col gap-3 border-t border-zinc-100 px-5 py-4 first:border-t-0 sm:flex-row sm:items-center">
-        <a class="flex min-w-0 flex-1 flex-col gap-1 text-sm transition hover:text-zinc-600 sm:flex-row sm:items-center sm:justify-between" href="{% url 'stories:run_detail' run.public_id %}" target="_blank" rel="noopener"><span>{{ run.display_label }}</span><time class="text-zinc-400">{{ run.completed_at|date:'d.m.Y H:i' }}</time></a>
-        <form method="post" class="flex shrink-0 items-center gap-2">
-          {% csrf_token %}<input type="hidden" name="action" value="set_run_status"><input type="hidden" name="run_id" value="{{ run.id }}">
-          <label class="sr-only" for="run-status-{{ run.id }}">Итоговый статус {{ run.get_os_display }} {{ run.version }}</label>
-          <select id="run-status-{{ run.id }}" class="h-9 rounded-lg border border-zinc-300 bg-white px-2 text-sm text-zinc-950" name="final_status">
-            <option value="ok" {% if run.final_status == 'ok' %}selected{% endif %}>ОК</option>
-            <option value="not_ok" {% if run.final_status == 'not_ok' %}selected{% endif %}>НЕ ОК</option>
-          </select>
-          <button class="h-9 rounded-lg border border-zinc-300 bg-white px-3 text-sm font-medium hover:bg-zinc-50" type="submit">Сохранить</button>
-        </form>
+        <a class="grid min-w-0 flex-1 gap-1 text-sm transition hover:text-zinc-600 sm:grid-cols-[1fr_auto] sm:items-center" href="{% url 'stories:run_detail' run.public_id %}" target="_blank" rel="noopener"><span>{{ run.display_label }}{% if run.final_comment %}<small class="mt-1 block font-normal text-zinc-500">{{ run.final_comment }}</small>{% endif %}</span><time class="text-zinc-400">{{ run.completed_at|date:'d.m.Y H:i' }}</time></a>
         <form method="post" class="shrink-0">{% csrf_token %}<input type="hidden" name="action" value="delete_run"><input type="hidden" name="run_id" value="{{ run.id }}"><button class="text-sm font-medium text-red-600 hover:text-red-800" type="submit" data-confirm="Удалить прогон и все связанные результаты? Это действие нельзя отменить.">Удалить</button></form>
       </div>
     {% endfor %}

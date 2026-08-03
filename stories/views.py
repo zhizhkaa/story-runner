@@ -26,10 +26,10 @@ from .models import (
 from .outline import OutlineError, numbered_outline, parse_outline, replace_template_from_outline, template_as_outline
 from .services import (
     PARTICIPANT_COOKIE,
+    complete_run,
     create_claim,
     create_participant,
     create_run_from_template,
-    force_complete,
     release_claim,
     resolve_participant,
     run_result_rows,
@@ -70,7 +70,7 @@ def annotated_run_tree(run):
     def stats(node_id):
         node = by_id[node_id]
         if node.kind == NodeKind.CHECK:
-            done = 1 if node.result_status else 0
+            done = 1 if node.result_status or node.is_skipped else 0
             busy = 1 if node.id in claimed else 0
             free = 1 if not done and not busy else 0
             return done, busy, free, 1
@@ -195,12 +195,18 @@ def run_detail(request, public_id):
     preview_url = request.build_absolute_uri(reverse("stories:run_preview", args=[run.public_id]))
     preview_url = f"{preview_url}?v={share_version}"
     if run.state == StoryRun.State.ACTIVE:
-        share_title = f"🔵 {run.get_os_display()} — {run.version} ({run.build})"
-        share_description = f"Активен: готово {done_count} из {total_count}, в работе {assigned_count}."
+        if run.is_ready:
+            share_title = f"⏳ {run.get_os_display()} — {run.version} ({run.build})"
+            share_description = f"Все {total_count} пунктов заполнены. Ожидает завершения администратором."
+        else:
+            share_title = f"🔵 {run.get_os_display()} — {run.version} ({run.build})"
+            share_description = f"Активен: готово {done_count} из {total_count}, в работе {assigned_count}."
     else:
         share_title = run.display_label
         result = "все пункты пройдены" if run.final_status == ResultStatus.OK else "есть ошибки"
         share_description = f"Завершён: {done_count} из {total_count}, {result}."
+        if run.final_comment:
+            share_description += f" {run.final_comment}"
     return render(
         request,
         "stories/run_detail.html",
@@ -225,7 +231,10 @@ def run_preview(request, public_id):
 
     run = get_object_or_404(StoryRun, public_id=public_id)
     done_count, total_count = run.progress
-    if run.state == StoryRun.State.ACTIVE:
+    if run.state == StoryRun.State.ACTIVE and run.is_ready:
+        accent = "#d97706"
+        status = "READY"
+    elif run.state == StoryRun.State.ACTIVE:
         accent = "#2563eb"
         status = "ACTIVE"
     elif run.final_status == ResultStatus.OK:
@@ -340,7 +349,7 @@ def claim_work(request, public_id):
             except ValueError as exc:
                 messages.error(request, str(exc))
             else:
-                messages.success(request, "Результаты отправлены. Пропущенные пункты доступны другим участникам.")
+                messages.success(request, "Результаты отправлены.")
                 return redirect("stories:home")
 
     items = list(claim.items.select_related("node").prefetch_related("node__skip_events", "draft"))
@@ -399,20 +408,16 @@ def manage_dashboard(request):
                 else:
                     messages.success(request, "Активный прогон создан.")
             return redirect("stories:manage_dashboard")
-        if action == "force_complete":
+        if action == "complete_run":
             run = get_object_or_404(StoryRun, pk=request.POST.get("run_id"), state=StoryRun.State.ACTIVE)
-            force_complete(run)
-            messages.success(request, "Прогон досрочно завершён со статусом «НЕ ОК».")
-            return redirect("stories:manage_dashboard")
-        if action == "set_run_status":
-            run = get_object_or_404(StoryRun, pk=request.POST.get("run_id"), state=StoryRun.State.COMPLETED)
             final_status = request.POST.get("final_status")
-            if final_status not in ResultStatus.values:
-                messages.error(request, "Выберите итоговый статус прогона.")
+            final_comment = request.POST.get("final_comment", "")
+            try:
+                complete_run(run, final_status, final_comment)
+            except ValueError as exc:
+                messages.error(request, str(exc))
             else:
-                run.final_status = final_status
-                run.save(update_fields=["final_status"])
-                messages.success(request, f"Итоговый статус изменён на «{run.get_final_status_display()}».")
+                messages.success(request, "Прогон завершён.")
             return redirect("stories:manage_dashboard")
         if action == "delete_run":
             run = get_object_or_404(StoryRun, pk=request.POST.get("run_id"))
@@ -433,10 +438,11 @@ def manage_dashboard(request):
                 kind=NodeKind.CHECK,
             )
             node.result_status = None
+            node.is_skipped = False
             node.note = ""
             node.completed_by_name = ""
             node.completed_at = None
-            node.save(update_fields=["result_status", "note", "completed_by_name", "completed_at"])
+            node.save(update_fields=["result_status", "is_skipped", "note", "completed_by_name", "completed_at"])
             messages.success(request, f"Пункт {node.code} снова доступен.")
             return redirect("stories:manage_dashboard")
 

@@ -6,11 +6,10 @@ from .models import Claim, DraftResult, NodeKind, Participant, ResultStatus, Run
 from .outline import numbered_outline, parse_outline, replace_template_from_outline
 from .services import (
     PARTICIPANT_COOKIE,
+    complete_run,
     create_claim,
     create_participant,
     create_run_from_template,
-    finalize_if_ready,
-    force_complete,
     run_result_rows,
     run_text,
     submit_claim,
@@ -85,7 +84,7 @@ class StoryRunnerTests(TestCase):
         self.assertFalse(ios.nodes.filter(code__startswith="5.").exists())
         self.assertEqual(ios.nodes.filter(kind=NodeKind.CHECK).count(), 92)
 
-    def test_skip_releases_leaf_and_keeps_audit(self):
+    def test_skip_completes_leaf_and_keeps_audit(self):
         run = self.make_run()
         first = self.participant("Анна")
         group = run.nodes.get(code="8.1")
@@ -102,6 +101,7 @@ class StoryRunnerTests(TestCase):
 
         skipped = run.nodes.get(code="8.1.а")
         self.assertIsNone(skipped.result_status)
+        self.assertTrue(skipped.is_skipped)
         self.assertFalse(hasattr(skipped, "claim_item"))
         event = SkipEvent.objects.get(node=skipped)
         self.assertEqual(event.participant_name, "Анна")
@@ -121,22 +121,8 @@ class StoryRunnerTests(TestCase):
         self.assertContains(select_page, "Пропуск")
         self.assertContains(select_page, "Нет тестовых данных")
 
-        second, second_token = create_participant("Борис")
-        second_claim = create_claim(run, second, [skipped.id])
-        second_client = Client()
-        second_client.cookies[PARTICIPANT_COOKIE] = second_token
-        work_page = second_client.get(reverse("stories:claim_work", args=[second_claim.public_id]))
-        self.assertContains(work_page, "Пропуск · Анна")
-        self.assertContains(work_page, "Нет тестовых данных")
-        self.assertNotContains(work_page, "<details")
-        item = second_claim.items.get()
-        submit_claim(second_claim, {f"action_{item.id}": "ok", f"note_{item.id}": ""})
-        skipped.refresh_from_db()
-        self.assertEqual(skipped.result_status, ResultStatus.OK)
-        self.assertEqual(skipped.completed_by_name, "Борис")
-        completed_row = next(row for row in run_result_rows(run) if row["node"].pk == skipped.pk)
-        self.assertEqual(completed_row["status_label"], "ОК ✅ ⚠️")
-        self.assertEqual(completed_row["note"], "Нет тестовых данных")
+        with self.assertRaisesMessage(ValueError, "завершены"):
+            create_claim(run, self.participant("Борис"), [skipped.id])
 
     def test_incomplete_submit_keeps_entered_drafts(self):
         run = self.make_run()
@@ -171,7 +157,7 @@ class StoryRunnerTests(TestCase):
         node = run.nodes.get(code="1.1")
         node.note = "Незначительное отличие"
         node.save(update_fields=["note"])
-        self.assertTrue(finalize_if_ready(run))
+        complete_run(run, ResultStatus.OK)
         run.refresh_from_db()
         self.assertEqual(run.final_status, ResultStatus.OK)
         self.assertEqual(run.status_label, "ОК ✅ ⚠️")
@@ -181,9 +167,13 @@ class StoryRunnerTests(TestCase):
         run = self.make_run()
         node = run.nodes.get(code="1.1")
         SkipEvent.objects.create(node=node, participant_name="Анна", reason="")
+        node.is_skipped = True
+        node.save(update_fields=["is_skipped"])
         run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
+        node.result_status = None
+        node.save(update_fields=["result_status"])
 
-        self.assertTrue(finalize_if_ready(run))
+        complete_run(run, ResultStatus.OK)
         run.refresh_from_db()
         self.assertEqual(run.final_status, ResultStatus.OK)
         self.assertEqual(run.status_label, "ОК ✅ ⚠️")
@@ -196,7 +186,7 @@ class StoryRunnerTests(TestCase):
             result_status=ResultStatus.NOT_OK,
             note="Нужно исправить",
         )
-        finalize_if_ready(run)
+        complete_run(run, ResultStatus.NOT_OK)
         run.refresh_from_db()
         self.assertEqual(run.final_status, ResultStatus.NOT_OK)
         self.assertEqual(run.status_label, "НЕ ОК ❌ ⚠️")
@@ -207,32 +197,45 @@ class StoryRunnerTests(TestCase):
         run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
         run.nodes.filter(code="1.1").update(result_status=ResultStatus.NOT_OK)
 
-        self.assertTrue(finalize_if_ready(run))
+        complete_run(run, ResultStatus.NOT_OK)
         run.refresh_from_db()
         self.assertEqual(run.status_label, "НЕ ОК ❌")
         self.assertEqual(run.display_label, "❌ Android — 1.2.3 (456)")
 
-    def test_forced_completion_is_failed_and_releases_claim(self):
+    def test_manual_completion_requires_every_item_and_accepts_skip(self):
         run = self.make_run()
-        claim = create_claim(run, self.participant(), [run.nodes.get(code="1.1").id])
-        force_complete(run)
-        run.refresh_from_db()
-        claim.refresh_from_db()
-        self.assertEqual(run.state, StoryRun.State.COMPLETED)
-        self.assertEqual(run.final_status, ResultStatus.NOT_OK)
-        self.assertTrue(run.forced)
-        self.assertEqual(claim.state, Claim.State.RELEASED)
-        self.assertFalse(claim.items.exists())
+        with self.assertRaisesMessage(ValueError, "заполните все пункты"):
+            complete_run(run, ResultStatus.OK)
 
-    def test_admin_can_override_completed_run_status(self):
+        run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
+        skipped = run.nodes.get(code="1.1")
+        skipped.result_status = None
+        skipped.is_skipped = True
+        skipped.save(update_fields=["result_status", "is_skipped"])
+        SkipEvent.objects.create(node=skipped, participant_name="Анна", reason="Сервис недоступен")
+
+        run.refresh_from_db()
+        self.assertTrue(run.is_ready)
+        self.assertEqual(run.state, StoryRun.State.ACTIVE)
+        self.assertEqual(run.progress, (95, 95))
+        home = self.client.get(reverse("stories:home"))
+        self.assertContains(home, "Ожидает завершения")
+        self.assertNotContains(home, "Взять пункты")
+        detail = self.client.get(reverse("stories:run_detail", args=[run.public_id]))
+        self.assertContains(detail, "⏳ Android — 1.2.3 (456)")
+        self.assertContains(detail, "Ожидает завершения")
+        complete_run(run, ResultStatus.OK, "Сервисы проверены частично")
+        run.refresh_from_db()
+        self.assertEqual(run.state, StoryRun.State.COMPLETED)
+        self.assertEqual(run.final_status, ResultStatus.OK)
+        self.assertEqual(run.final_comment, "Сервисы проверены частично")
+        self.assertEqual(run.status_label, "ОК ✅ ⚠️")
+
+    def test_completed_run_status_cannot_be_overridden(self):
         run = self.make_run()
         run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
-        finalize_if_ready(run)
+        complete_run(run, ResultStatus.OK)
         run.refresh_from_db()
-        completed_at = run.completed_at
-        old_share_url = self.client.get(
-            reverse("stories:run_detail", args=[run.public_id])
-        ).context["share_url"]
 
         session = self.client.session
         session["story_admin"] = True
@@ -245,28 +248,55 @@ class StoryRunnerTests(TestCase):
                 "run_id": run.id,
                 "final_status": ResultStatus.NOT_OK,
             },
+        )
+
+        run.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(run.state, StoryRun.State.COMPLETED)
+        self.assertEqual(run.final_status, ResultStatus.OK)
+        self.assertNotContains(response, 'value="set_run_status"')
+        with self.assertRaisesMessage(ValueError, "уже завершён"):
+            complete_run(run, ResultStatus.NOT_OK)
+
+    def test_admin_completion_button_appears_only_when_ready(self):
+        run = self.make_run()
+        session = self.client.session
+        session["story_admin"] = True
+        session.save()
+
+        page = self.client.get(reverse("stories:manage_dashboard"))
+        self.assertNotContains(page, 'value="complete_run"')
+
+        run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
+        page = self.client.get(reverse("stories:manage_dashboard"))
+        self.assertContains(page, "Прогон ожидает завершения")
+        self.assertContains(page, 'value="complete_run"')
+        self.assertContains(page, "Комментарий к итоговому статусу")
+
+        response = self.client.post(
+            reverse("stories:manage_dashboard"),
+            {
+                "action": "complete_run",
+                "run_id": run.id,
+                "final_status": ResultStatus.NOT_OK,
+                "final_comment": "Есть блокирующая ошибка",
+            },
             follow=True,
         )
 
         run.refresh_from_db()
-        self.assertContains(response, "Итоговый статус изменён на «НЕ ОК».")
+        self.assertContains(response, "Прогон завершён.")
         self.assertEqual(run.state, StoryRun.State.COMPLETED)
         self.assertEqual(run.final_status, ResultStatus.NOT_OK)
-        self.assertEqual(run.completed_at, completed_at)
-        self.assertContains(response, 'value="set_run_status"')
-        self.assertContains(response, '<option value="not_ok" selected>НЕ ОК</option>', html=True)
-        new_share_url = self.client.get(
-            reverse("stories:run_detail", args=[run.public_id])
-        ).context["share_url"]
-        self.assertNotEqual(old_share_url, new_share_url)
-        self.assertIn("completed-not_ok", new_share_url)
+        self.assertEqual(run.final_comment, "Есть блокирующая ошибка")
+        self.assertContains(response, "Есть блокирующая ошибка")
 
     def test_admin_can_delete_active_and_completed_runs(self):
         active_run = self.make_run()
         claim = create_claim(active_run, self.participant(), [active_run.nodes.get(code="1.1").id])
         completed_run = self.make_run(StoryRun.OS.IOS)
         completed_run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
-        finalize_if_ready(completed_run)
+        complete_run(completed_run, ResultStatus.OK)
 
         session = self.client.session
         session["story_admin"] = True
@@ -372,7 +402,7 @@ class StoryRunnerTests(TestCase):
     def test_archive_filter_search_and_public_detail(self):
         run = self.make_run()
         run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
-        finalize_if_ready(run)
+        complete_run(run, ResultStatus.OK)
         response = self.client.get(reverse("stories:home"), {"os": "android", "q": "1.2.3"})
         self.assertContains(response, "✅ Android — 1.2.3 (456)")
         self.assertNotContains(response, "1 прогон")

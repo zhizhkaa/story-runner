@@ -120,6 +120,7 @@ def create_claim(run, participant, selected_ids):
         RunNode.objects.filter(
             id__in=check_ids,
             result_status__isnull=True,
+            is_skipped=False,
             claim_item__isnull=True,
         ).values_list("id", flat=True)
     )
@@ -170,17 +171,22 @@ def submit_claim(claim, payload):
                     participant_name=claim.participant.display_name,
                     reason=draft.note,
                 )
+                node.is_skipped = True
+                node.note = ""
+                node.completed_by_name = claim.participant.display_name
+                node.completed_at = now
+                node.save(update_fields=["is_skipped", "note", "completed_by_name", "completed_at"])
             else:
                 node.result_status = draft.action
+                node.is_skipped = False
                 node.note = draft.note
                 node.completed_by_name = claim.participant.display_name
                 node.completed_at = now
-                node.save(update_fields=["result_status", "note", "completed_by_name", "completed_at"])
+                node.save(update_fields=["result_status", "is_skipped", "note", "completed_by_name", "completed_at"])
         claim.items.all().delete()
         claim.state = Claim.State.SUBMITTED
         claim.submitted_at = now
         claim.save(update_fields=["state", "submitted_at"])
-        finalize_if_ready(claim.run)
 
 
 @transaction.atomic
@@ -194,34 +200,21 @@ def release_claim(claim):
 
 
 @transaction.atomic
-def finalize_if_ready(run):
+def complete_run(run, final_status, final_comment=""):
+    if final_status not in (ResultStatus.OK, ResultStatus.NOT_OK):
+        raise ValueError("Выберите итоговый статус прогона")
     run = StoryRun.objects.select_for_update().get(pk=run.pk)
     if run.state != StoryRun.State.ACTIVE:
-        return False
+        raise ValueError("Прогон уже завершён")
     checks = run.nodes.filter(kind=NodeKind.CHECK)
-    if checks.filter(result_status__isnull=True).exists():
-        return False
-    run.final_status = ResultStatus.NOT_OK if checks.filter(result_status=ResultStatus.NOT_OK).exists() else ResultStatus.OK
+    if checks.filter(result_status__isnull=True, is_skipped=False).exists():
+        raise ValueError("Сначала заполните все пункты прогона")
+    run.final_status = final_status
+    run.final_comment = final_comment.strip()
     run.state = StoryRun.State.COMPLETED
     run.completed_at = timezone.now()
-    run.save(update_fields=["final_status", "state", "completed_at"])
-    return True
-
-
-@transaction.atomic
-def force_complete(run):
-    run = StoryRun.objects.select_for_update().get(pk=run.pk)
-    if run.state != StoryRun.State.ACTIVE:
-        return
-    for claim in run.claims.filter(state=Claim.State.OPEN):
-        claim.items.all().delete()
-        claim.state = Claim.State.RELEASED
-        claim.save(update_fields=["state"])
-    run.final_status = ResultStatus.NOT_OK
-    run.state = StoryRun.State.COMPLETED
-    run.forced = True
-    run.completed_at = timezone.now()
-    run.save(update_fields=["final_status", "state", "forced", "completed_at"])
+    run.save(update_fields=["final_status", "final_comment", "state", "completed_at"])
+    return run
 
 
 def claimed_node_names(run):
@@ -244,22 +237,25 @@ def node_visible_note(node, skip_events=None):
     return " · ".join(notes)
 
 
-def node_status(run, node, claimed_names, was_skipped=False):
+def node_status(run, node, claimed_names):
     if node.result_status == ResultStatus.OK:
         return "ОК ✅", "ok"
     if node.result_status == ResultStatus.NOT_OK:
         return "НЕ ОК ❌", "not_ok"
+    if node.is_skipped:
+        return "Пропуск", "skip"
     if run.state == StoryRun.State.ACTIVE and node.id in claimed_names:
         return f"В работе — {claimed_names[node.id]}", "working"
-    if was_skipped:
-        return "Пропуск", "skip"
     if run.state == StoryRun.State.ACTIVE:
         return "Свободен", "empty"
     return "БЕЗ РЕЗУЛЬТАТА", "empty"
 
 
 def run_text(run):
-    lines = [f"{run.get_os_display()} — {run.version} ({run.build})", ""]
+    lines = [f"{run.get_os_display()} — {run.version} ({run.build})"]
+    if run.final_comment:
+        lines.append(f"Комментарий к прогону: {run.final_comment}")
+    lines.append("")
     claimed_names = claimed_node_names(run)
     nodes = list(run.nodes.prefetch_related("skip_events").all())
     rows = tree_rows(nodes)
@@ -280,7 +276,10 @@ def run_text(run):
                         break
                     if descendant.kind == NodeKind.CHECK:
                         descendants.append(descendant)
-                if descendants and all(item.result_status == ResultStatus.OK for item in descendants):
+                if descendants and all(
+                    item.result_status == ResultStatus.OK or item.is_skipped
+                    for item in descendants
+                ):
                     icon = "✅ "
                 elif any(item.result_status == ResultStatus.NOT_OK for item in descendants):
                     icon = "❌ "
@@ -291,7 +290,7 @@ def run_text(run):
         else:
             skip_events = list(node.skip_events.all())
             visible_note = node_visible_note(node, skip_events)
-            status, _tone = node_status(run, node, claimed_names, bool(skip_events))
+            status, _tone = node_status(run, node, claimed_names)
             status = status.replace(" ✅", "").replace(" ❌", "")
             warning = " ⚠️" if visible_note else ""
             line = f"{indent}{node.code} {node.title} — **{status}{warning}**"
@@ -317,12 +316,7 @@ def run_result_rows(run):
             "note": visible_note,
         }
         if node.kind == NodeKind.CHECK:
-            row["status_label"], row["status_tone"] = node_status(
-                run,
-                node,
-                claimed_names,
-                bool(skip_events),
-            )
+            row["status_label"], row["status_tone"] = node_status(run, node, claimed_names)
             if visible_note:
                 row["status_label"] += " ⚠️"
         rows.append(row)
