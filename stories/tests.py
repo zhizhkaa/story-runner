@@ -327,7 +327,7 @@ class StoryRunnerTests(TestCase):
         self.assertContains(page, 'value="bulk_reset_nodes"')
         self.assertContains(page, "Сбросить пункты")
         self.assertContains(page, "Сбросить выбранные")
-        self.assertContains(page, "data-reset-dialog")
+        self.assertContains(page, 'data-dialog-open="reset-dialog-')
         self.assertContains(page, "data-details-chevron")
         self.assertNotContains(page, "Выбрать пропуски")
         self.assertNotContains(page, "Выбрать все")
@@ -388,6 +388,8 @@ class StoryRunnerTests(TestCase):
         self.assertContains(page, "Прогон ожидает завершения")
         self.assertContains(page, 'value="complete_run"')
         self.assertContains(page, "Комментарий к итоговому статусу")
+        self.assertContains(page, 'data-dialog-open="complete-dialog-')
+        self.assertContains(page, "Завершить прогон")
 
         response = self.client.post(
             reverse("stories:manage_dashboard"),

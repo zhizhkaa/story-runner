@@ -39,15 +39,15 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
-  const dialogOpen = event.target.closest("[data-reset-dialog-open]");
+  const dialogOpen = event.target.closest("[data-dialog-open]");
   if (dialogOpen) {
-    const dialog = document.getElementById(dialogOpen.dataset.resetDialogOpen);
+    const dialog = document.getElementById(dialogOpen.dataset.dialogOpen);
     dialog?.querySelector("form")?.reset();
     dialog?.showModal();
     return;
   }
 
-  const dialogClose = event.target.closest("[data-reset-dialog-close]");
+  const dialogClose = event.target.closest("[data-dialog-close]");
   if (dialogClose) {
     dialogClose.closest("dialog")?.close();
     return;
@@ -92,7 +92,7 @@ document.querySelectorAll("[data-bulk-reset-form]").forEach((form) => {
   updateSubmit();
 });
 
-document.querySelectorAll("[data-reset-dialog]").forEach((dialog) => {
+document.querySelectorAll("[data-dialog]").forEach((dialog) => {
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) dialog.close();
   });
