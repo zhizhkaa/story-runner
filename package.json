@@ -4,14 +4,12 @@
   "scripts": {
     "css:build": "tailwindcss -i ./assets/tailwind.css -o ./stories/static/stories/styles.css --minify",
     "css:watch": "tailwindcss -i ./assets/tailwind.css -o ./stories/static/stories/styles.css --watch",
-    "icons:build": "cp ./node_modules/lucide/dist/umd/lucide.min.js ./node_modules/lucide/dist/umd/lucide.min.js.map ./stories/static/stories/",
+    "icons:build": "node ./scripts/build-icons.mjs",
     "assets:build": "npm run css:build && npm run icons:build"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",
+    "lucide": "^1.28.0",
     "tailwindcss": "^4.3.3"
-  },
-  "dependencies": {
-    "lucide": "^1.28.0"
   }
 }

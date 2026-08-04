@@ -6,7 +6,7 @@ from functools import wraps
 from django.conf import settings
 from django.contrib import messages
 from django.db import IntegrityError
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -229,53 +229,56 @@ def run_detail(request, public_id):
 
 @require_GET
 def run_preview(request, public_id):
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw
 
     run = get_object_or_404(StoryRun, public_id=public_id)
-    done_count, total_count = run.progress
-    if run.state == StoryRun.State.ACTIVE and run.is_ready:
-        accent = "#d97706"
-        status = "READY"
-    elif run.state == StoryRun.State.ACTIVE:
-        accent = "#2563eb"
-        status = "ACTIVE"
-    elif run.final_status == ResultStatus.OK:
-        accent = "#059669"
-        status = "PASSED"
-    else:
-        accent = "#dc2626"
-        status = "FAILED"
+    data = _preview_data(run)
 
     image = Image.new("RGB", (1200, 630), "#f4f4f5")
     draw = ImageDraw.Draw(image)
     draw.rounded_rectangle((48, 48, 1152, 582), radius=42, fill="#ffffff", outline="#e4e4e7", width=3)
-    draw.ellipse((90, 88, 210, 208), fill=accent)
-    if status == "PASSED":
-        draw.line((122, 150, 145, 174), fill="#ffffff", width=13)
-        draw.line((145, 174, 181, 125), fill="#ffffff", width=13)
-    elif status == "FAILED":
-        draw.line((126, 124, 176, 174), fill="#ffffff", width=13)
-        draw.line((176, 124, 126, 174), fill="#ffffff", width=13)
-    else:
-        draw.polygon(((137, 122), (137, 178), (180, 150)), fill="#ffffff")
 
-    small = ImageFont.load_default(size=28)
-    medium = ImageFont.load_default(size=46)
-    large = ImageFont.load_default(size=72)
-    draw.text((242, 94), "STORY RUNNER", font=small, fill="#71717a")
-    draw.text((242, 142), status, font=medium, fill=accent)
-    draw.text((90, 275), run.get_os_display().upper(), font=large, fill="#18181b")
-    draw.text((90, 370), f"{run.version}  ({run.build})", font=medium, fill="#3f3f46")
-    draw.text((90, 485), f"{done_count} / {total_count} CHECKS", font=small, fill="#71717a")
+    brand_font = _preview_font(26)
+    status_font = _preview_font(27, bold=True)
+    os_font = _preview_font(32)
+    build_font = _preview_font(28)
+    progress_font = _preview_font(64, bold=True)
+    label_font = _preview_font(24)
+    metric_font = _preview_font(44, bold=True)
+    metric_label_font = _preview_font(21)
 
-    for index, width in enumerate((330, 390, 290, 350)):
-        y = 280 + index * 58
-        draw.rounded_rectangle((730, y, 730 + width, y + 20), radius=10, fill="#e4e4e7")
-    progress_width = 420
-    draw.rounded_rectangle((730, 500, 730 + progress_width, 520), radius=10, fill="#e4e4e7")
-    filled_width = int(progress_width * done_count / total_count) if total_count else 0
+    draw.text((90, 86), "STORY RUNNER", font=brand_font, fill="#52525b")
+    status_width = int(draw.textlength(data["status"], font=status_font)) + 68
+    status_left = 1110 - status_width
+    draw.rounded_rectangle((status_left, 76, 1110, 124), radius=24, fill=data["soft"])
+    draw.ellipse((status_left + 20, 93, status_left + 34, 107), fill=data["accent"])
+    draw.text((status_left + 46, 83), data["status"], font=status_font, fill=data["accent"])
+    draw.line((90, 150, 1110, 150), fill="#e4e4e7", width=2)
+
+    draw.text((90, 190), data["os"], font=os_font, fill="#52525b")
+    version_font, version = _preview_fit_text(draw, data["version"], 500, 76, 42)
+    draw.text((90, 232), version, font=version_font, fill="#18181b")
+    build = _preview_clip_text(draw, f"Сборка {data['build']}", build_font, 500)
+    draw.text((90, 335), build, font=build_font, fill="#52525b")
+
+    progress_text = f"{data['done']} / {data['total']}"
+    draw.text((650, 195), progress_text, font=progress_font, fill="#18181b")
+    draw.text((650, 278), "пунктов готово", font=label_font, fill="#52525b")
+    progress_width = 460
+    draw.rounded_rectangle((650, 332, 650 + progress_width, 350), radius=9, fill="#e4e4e7")
+    filled_width = int(progress_width * data["done"] / data["total"]) if data["total"] else 0
     if filled_width:
-        draw.rounded_rectangle((730, 500, 730 + filled_width, 520), radius=10, fill=accent)
+        draw.rounded_rectangle((650, 332, 650 + filled_width, 350), radius=9, fill=data["accent"])
+
+    draw.line((90, 410, 1110, 410), fill="#e4e4e7", width=2)
+    metric_width = 255
+    for index, (label, value) in enumerate(data["metrics"]):
+        left = 90 + index * metric_width
+        if index:
+            draw.line((left, 442, left, 540), fill="#e4e4e7", width=2)
+        draw.text((left + (18 if index else 0), 438), str(value), font=metric_font, fill="#18181b")
+        clipped_label = _preview_clip_text(draw, label, metric_label_font, metric_width - 36)
+        draw.text((left + (18 if index else 0), 502), clipped_label, font=metric_label_font, fill="#52525b")
 
     output = io.BytesIO()
     image.save(output, format="PNG", optimize=True)
@@ -285,6 +288,112 @@ def run_preview(request, public_id):
     else:
         response["Cache-Control"] = "public, max-age=60"
     return response
+
+
+def _preview_data(run):
+    checks = run.nodes.filter(kind=NodeKind.CHECK)
+    stats = checks.aggregate(
+        total=Count("id"),
+        ok=Count("id", filter=Q(result_status=ResultStatus.OK)),
+        not_ok=Count("id", filter=Q(result_status=ResultStatus.NOT_OK)),
+        skipped=Count("id", filter=Q(is_skipped=True)),
+        notes=Count("id", filter=~Q(note="")),
+    )
+    done = stats["ok"] + stats["not_ok"] + stats["skipped"]
+    open_claims = run.claims.filter(state=Claim.State.OPEN)
+    assigned = open_claims.aggregate(total=Count("items"))["total"] or 0
+    participants = open_claims.values("participant_id").distinct().count()
+    free = max(stats["total"] - done - assigned, 0)
+
+    if run.state == StoryRun.State.ACTIVE and done == stats["total"] and stats["total"]:
+        status = "Ожидает завершения"
+        accent = "#b45309"
+        soft = "#fffbeb"
+        metrics = (
+            ("ОК", stats["ok"]),
+            ("НЕ ОК", stats["not_ok"]),
+            ("Пропусков", stats["skipped"]),
+            ("Замечаний", stats["notes"]),
+        )
+    elif run.state == StoryRun.State.ACTIVE:
+        status = "В работе"
+        accent = "#1d4ed8"
+        soft = "#eff6ff"
+        metrics = (
+            ("В работе", assigned),
+            ("Свободно", free),
+            ("Участников", participants),
+            ("Пропусков", stats["skipped"]),
+        )
+    elif run.final_status == ResultStatus.OK:
+        status = "Завершён · ОК"
+        accent = "#047857"
+        soft = "#ecfdf5"
+        metrics = (
+            ("ОК", stats["ok"]),
+            ("НЕ ОК", stats["not_ok"]),
+            ("Пропусков", stats["skipped"]),
+            ("Замечаний", stats["notes"] + bool(run.final_comment.strip())),
+        )
+    else:
+        status = "Завершён · НЕ ОК"
+        accent = "#b91c1c"
+        soft = "#fef2f2"
+        metrics = (
+            ("ОК", stats["ok"]),
+            ("НЕ ОК", stats["not_ok"]),
+            ("Пропусков", stats["skipped"]),
+            ("Замечаний", stats["notes"] + bool(run.final_comment.strip())),
+        )
+
+    return {
+        "os": run.get_os_display(),
+        "version": run.version,
+        "build": run.build,
+        "status": status,
+        "accent": accent,
+        "soft": soft,
+        "done": done,
+        "total": stats["total"],
+        "metrics": metrics,
+    }
+
+
+def _preview_fit_text(draw, text, max_width, max_size, min_size):
+    for size in range(max_size, min_size - 1, -2):
+        font = _preview_font(size, bold=True)
+        if draw.textlength(text, font=font) <= max_width:
+            return font, text
+    font = _preview_font(min_size, bold=True)
+    return font, _preview_clip_text(draw, text, font, max_width)
+
+
+def _preview_font(size, bold=False):
+    from pathlib import Path
+
+    from PIL import ImageFont
+
+    filename = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
+    mac_filename = "Arial Bold.ttf" if bold else "Arial.ttf"
+    candidates = (
+        Path("/usr/share/fonts/truetype/dejavu") / filename,
+        Path("/System/Library/Fonts/Supplemental") / mac_filename,
+        Path("C:/Windows/Fonts") / ("arialbd.ttf" if bold else "arial.ttf"),
+    )
+    for path in candidates:
+        if path.exists():
+            return ImageFont.truetype(path, size=size)
+    raise RuntimeError("Не найден шрифт с поддержкой кириллицы для social preview.")
+
+
+def _preview_clip_text(draw, text, font, max_width):
+    if draw.textlength(text, font=font) <= max_width:
+        return text
+    suffix = "…"
+    clipped = text
+    while clipped and draw.textlength(clipped + suffix, font=font) > max_width:
+        clipped = clipped[:-1]
+    return clipped.rstrip() + suffix
 
 
 @require_http_methods(["GET", "POST"])

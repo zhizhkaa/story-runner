@@ -1,7 +1,7 @@
 {% extends 'stories/base.html' %}
 {% block title %}Выбрать пункты{% endblock %}
 {% block content %}
-<a class="text-sm text-zinc-500 hover:text-zinc-950" href="{% url 'stories:home' %}">← Назад</a>
+<a class="inline-flex min-h-11 items-center text-sm text-zinc-500 hover:text-zinc-950" href="{% url 'stories:home' %}">← Назад</a>
 <div class="mt-8 border-b border-zinc-200 pb-6">
   <p class="text-sm text-zinc-500">{{ run.get_os_display }} — {{ run.version }} ({{ run.build }})</p>
   <h1 class="mt-2 text-3xl font-semibold tracking-tight">Выберите пункты</h1>
@@ -10,7 +10,7 @@
 <form method="post" class="mt-5 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
   {% csrf_token %}
   <div class="border-b border-zinc-200 p-4 sm:p-5">
-    <label class="grid max-w-md gap-1.5 text-sm text-zinc-600"><span>Ваше имя</span><input class="h-11 rounded-xl border border-zinc-300 px-3 text-zinc-950 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200" name="display_name" maxlength="80" value="{% if participant %}{{ participant.display_name }}{% endif %}" required autocomplete="name"></label>
+    <label class="grid max-w-md gap-1.5 text-sm text-zinc-600"><span>Ваше имя</span><input class="h-11 rounded-xl border border-zinc-300 px-3 text-base text-zinc-950 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 sm:text-sm" name="display_name" maxlength="80" value="{% if participant %}{{ participant.display_name }}{% endif %}" required autocomplete="name"></label>
   </div>
   <fieldset class="claim-tree">
     <legend class="sr-only">Разделы и пункты</legend>
@@ -21,7 +21,7 @@
           <span><strong class="font-semibold">{{ row.node.code }}</strong> {{ row.node.title }}</span>
           {% if row.visible_note %}<span class="text-xs leading-5 text-amber-700">⚠️ {{ row.visible_note }}</span>{% endif %}
         </span>
-        <span class="col-start-2 text-xs text-zinc-400 sm:col-start-auto">
+        <span class="col-start-2 text-xs text-zinc-500 sm:col-start-auto">
           {% if row.node.kind == 'check' and row.node.result_status %}Готово{% elif row.node.kind == 'check' and row.node.is_skipped %}<span class="font-medium text-amber-700">Пропуск</span>{% elif row.node.kind == 'check' and row.claimed_by %}Взял {{ row.claimed_by }}{% elif row.node.kind == 'group' %}Свободно {{ row.free }} из {{ row.total }}{% endif %}
         </span>
       </label>

@@ -1,10 +1,21 @@
 function flashButton(button, text) {
   const original = button.innerHTML;
   button.textContent = text;
+  const status = document.getElementById("ui-status");
+  if (status) status.textContent = text;
   setTimeout(() => { button.innerHTML = original; }, 1500);
 }
 
-window.lucide?.createIcons();
+window.storyRunnerIcons?.createIcons();
+
+async function copyWithFeedback(button, action) {
+  try {
+    await action();
+    flashButton(button, "Скопировано");
+  } catch (_error) {
+    flashButton(button, "Не удалось скопировать");
+  }
+}
 
 function escapedHtml(value) {
   return value
@@ -92,21 +103,21 @@ document.addEventListener("click", async (event) => {
   const copyText = event.target.closest(".copy-text");
   if (copyText) {
     const target = document.getElementById(copyText.dataset.copyTarget);
-    await copyFormattedText(target.value);
-    flashButton(copyText, "Скопировано");
+    await copyWithFeedback(copyText, () => copyFormattedText(target.value));
+    return;
   }
 
   const copyLink = event.target.closest(".copy-link");
   if (copyLink) {
     const url = new URL(copyLink.dataset.copyUrl, window.location.origin).href;
-    await navigator.clipboard.writeText(url);
-    flashButton(copyLink, "Ссылка скопирована");
+    await copyWithFeedback(copyLink, () => navigator.clipboard.writeText(url));
+    return;
   }
 
   const copyCurrentLink = event.target.closest(".copy-current-link");
   if (copyCurrentLink) {
-    await navigator.clipboard.writeText(copyCurrentLink.dataset.copyUrl || window.location.href);
-    flashButton(copyCurrentLink, "Ссылка скопирована");
+    const url = copyCurrentLink.dataset.copyUrl || window.location.href;
+    await copyWithFeedback(copyCurrentLink, () => navigator.clipboard.writeText(url));
   }
 });
 

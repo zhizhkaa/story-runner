@@ -7,19 +7,20 @@
   <meta name="color-scheme" content="light">
   <title>{% block title %}Прогоны{% endblock %}</title>
   {% block meta %}{% endblock %}
+  <link rel="icon" href="{% static 'stories/favicon.svg' %}" type="image/svg+xml">
   <link rel="stylesheet" href="{% static 'stories/styles.css' %}">
-  <script src="{% static 'stories/lucide.min.js' %}" defer></script>
+  <script src="{% static 'stories/icons.js' %}" defer></script>
   <script src="{% static 'stories/app.js' %}" defer></script>
 </head>
 <body class="min-h-screen bg-zinc-50 font-sans text-zinc-950 antialiased">
   <main class="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-    <nav class="mb-10 flex min-h-9 items-center justify-end gap-5 text-sm text-zinc-500" aria-label="Навигация">
+    <nav class="mb-10 flex min-h-11 items-center justify-end gap-5 text-sm text-zinc-500" aria-label="Навигация">
       {% if request.session.story_admin %}
-        <a class="transition hover:text-zinc-950" href="{% url 'stories:home' %}">Главная</a>
-        <a class="transition hover:text-zinc-950" href="{% url 'stories:manage_dashboard' %}">Управление</a>
-        <form method="post" action="{% url 'stories:manage_logout' %}">{% csrf_token %}<button class="transition hover:text-zinc-950" type="submit">Выйти</button></form>
+        <a class="inline-flex min-h-11 items-center transition hover:text-zinc-950" href="{% url 'stories:home' %}">Главная</a>
+        <a class="inline-flex min-h-11 items-center transition hover:text-zinc-950" href="{% url 'stories:manage_dashboard' %}">Управление</a>
+        <form method="post" action="{% url 'stories:manage_logout' %}">{% csrf_token %}<button class="inline-flex min-h-11 items-center transition hover:text-zinc-950" type="submit">Выйти</button></form>
       {% else %}
-        <a class="transition hover:text-zinc-950" href="{% url 'stories:manage_login' %}">Редактировать</a>
+        <a class="inline-flex min-h-11 items-center transition hover:text-zinc-950" href="{% url 'stories:manage_login' %}">Редактировать</a>
       {% endif %}
     </nav>
 
@@ -31,12 +32,13 @@
       </div>
     {% endif %}
     {% block content %}{% endblock %}
+    <div id="ui-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
     <dialog id="confirm-dialog" class="m-auto w-[min(28rem,calc(100%-2rem))] rounded-2xl border-0 bg-white p-0 text-zinc-950 shadow-2xl backdrop:bg-zinc-950/45 open:flex open:flex-col" data-dialog aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-body">
       <div class="px-5 pb-2 pt-5 sm:px-6 sm:pt-6"><h2 id="confirm-dialog-title" class="text-lg font-semibold">Подтвердить действие?</h2><p id="confirm-dialog-body" class="mt-2 text-sm leading-6 text-zinc-600"></p></div>
       <div class="mt-4 flex flex-col-reverse gap-2 border-t border-zinc-200 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
-        <button class="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50" type="button" data-dialog-close>Отмена</button>
-        <button class="rounded-xl bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800" type="button" data-confirm-dialog-action>Продолжить</button>
+        <button class="min-h-11 rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50" type="button" data-dialog-close>Отмена</button>
+        <button class="min-h-11 rounded-xl bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800" type="button" data-confirm-dialog-action>Продолжить</button>
       </div>
     </dialog>
   </main>

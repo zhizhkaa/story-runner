@@ -16,6 +16,7 @@ from .services import (
     run_text,
     submit_claim,
 )
+from .views import _preview_data
 
 
 class StoryRunnerTests(TestCase):
@@ -486,6 +487,13 @@ class StoryRunnerTests(TestCase):
         run = self.make_run(build="123")
         create_claim(run, self.participant("Анна"), [run.nodes.get(code="1.1").id])
 
+        preview_data = _preview_data(run)
+        self.assertEqual(preview_data["status"], "В работе")
+        self.assertEqual(
+            dict(preview_data["metrics"]),
+            {"В работе": 1, "Свободно": 94, "Участников": 1, "Пропусков": 0},
+        )
+
         response = self.client.get(reverse("stories:run_detail", args=[run.public_id]))
         self.assertContains(response, "Активен")
         self.assertContains(response, "Готово 0 из 95")
@@ -505,6 +513,32 @@ class StoryRunnerTests(TestCase):
         self.assertEqual(preview.status_code, 200)
         self.assertEqual(preview["Content-Type"], "image/png")
         self.assertTrue(preview.content.startswith(b"\x89PNG\r\n\x1a\n"))
+
+    def test_social_preview_reflects_ready_and_completed_states(self):
+        run = self.make_run(build="789")
+        run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
+
+        ready_data = _preview_data(run)
+        self.assertEqual(ready_data["status"], "Ожидает завершения")
+        self.assertEqual(dict(ready_data["metrics"])["ОК"], 95)
+
+        complete_run(run, ResultStatus.OK, "Проверено командой")
+        run.refresh_from_db()
+        completed_data = _preview_data(run)
+        self.assertEqual(completed_data["status"], "Завершён · ОК")
+        self.assertEqual(dict(completed_data["metrics"])["Замечаний"], 1)
+
+    def test_social_preview_handles_long_version_and_build(self):
+        run = self.make_run(
+            version="Очень-длинная-версия-2026.08.04-release-candidate",
+            build="Очень-длинная-сборка-для-проверки-обрезки-подписи",
+        )
+
+        preview = self.client.get(reverse("stories:run_preview", args=[run.public_id]))
+
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview["Content-Type"], "image/png")
+        self.assertGreater(len(preview.content), 1_000)
 
     def test_claim_page_uses_compact_run_title_and_cascade_tree(self):
         run = self.make_run(build="123")

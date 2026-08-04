@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY assets ./assets
+COPY scripts ./scripts
 COPY stories/templates ./stories/templates
 COPY stories/static/stories/app.js ./stories/static/stories/app.js
 RUN npm run assets:build
@@ -16,13 +17,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends fonts-dejavu-core && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 COPY --from=assets /app/stories/static/stories/styles.css /app/stories/static/stories/styles.css
-COPY --from=assets /app/stories/static/stories/lucide.min.js /app/stories/static/stories/lucide.min.js
-COPY --from=assets /app/stories/static/stories/lucide.min.js.map /app/stories/static/stories/lucide.min.js.map
+COPY --from=assets /app/stories/static/stories/icons.js /app/stories/static/stories/icons.js
 RUN mkdir -p /app/data /app/staticfiles && \
     chmod +x /app/entrypoint.sh && \
     DEBUG=0 SECRET_KEY=build-only-secret ADMIN_PASSWORD=build-only-password \

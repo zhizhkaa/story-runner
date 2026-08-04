@@ -21,7 +21,7 @@ jobs:
           cache: npm
       - run: pip install -r requirements.txt
       - run: npm ci
-      - run: npm run css:build
+      - run: npm run assets:build
       - run: python manage.py test
       - run: python manage.py check
       - run: python manage.py collectstatic --noinput
