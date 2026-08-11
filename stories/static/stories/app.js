@@ -6,15 +6,6 @@ function flashButton(button, text) {
   setTimeout(() => { button.innerHTML = original; }, 1500);
 }
 
-function russianCount(value, one, few, many) {
-  const mod100 = value % 100;
-  const mod10 = value % 10;
-  if (mod100 >= 11 && mod100 <= 14) return many;
-  if (mod10 === 1) return one;
-  if (mod10 >= 2 && mod10 <= 4) return few;
-  return many;
-}
-
 window.storyRunnerIcons?.createIcons();
 
 async function copyWithFeedback(button, action) {
@@ -23,8 +14,6 @@ async function copyWithFeedback(button, action) {
     flashButton(button, "Скопировано");
   } catch (_error) {
     flashButton(button, "Не удалось скопировать");
-    const status = document.getElementById("ui-status");
-    if (status) status.textContent = "Не удалось скопировать. Выделите и скопируйте текст вручную.";
   }
 }
 
@@ -158,12 +147,6 @@ document.querySelectorAll("[data-dialog]").forEach((dialog) => {
 
 document.querySelectorAll(".claim-tree").forEach((tree) => {
   const rows = Array.from(tree.querySelectorAll("[data-claim-depth]"));
-  const form = tree.closest("form");
-  const submit = form?.querySelector("[data-claim-submit]");
-  const selected = form?.querySelector("[data-claim-selected]");
-  const search = form?.querySelector("[data-claim-search]");
-  const empty = tree.querySelector("[data-claim-empty]");
-  const sections = Array.from(tree.querySelectorAll("[data-claim-section]"));
 
   const setRowSelected = (row, checkbox) => {
     row.classList.toggle("bg-zinc-100", checkbox.checked || checkbox.indeterminate);
@@ -204,53 +187,6 @@ document.querySelectorAll(".claim-tree").forEach((tree) => {
     }
   };
 
-  const updateSelection = () => {
-    const checked = rows.filter((row) => row.dataset.claimKind === "check")
-      .map((row) => row.querySelector(".claim-node"))
-      .filter((input) => input && !input.disabled && input.checked).length;
-    if (selected) {
-      selected.textContent = checked
-        ? `Выбрано: ${checked} ${russianCount(checked, "пункт", "пункта", "пунктов")}`
-        : "Пункты не выбраны";
-    }
-    if (submit) {
-      submit.disabled = checked === 0;
-      const label = submit.querySelector("span");
-      if (label) label.textContent = checked ? `Начать · ${checked}` : "Начать";
-    }
-  };
-
-  const filterRows = () => {
-    const query = search?.value.trim().toLocaleLowerCase("ru") || "";
-    const visible = new Set();
-    if (query) {
-      rows.forEach((row, index) => {
-        if (!(row.dataset.claimText || "").includes(query)) return;
-        visible.add(row);
-        let childDepth = Number(row.dataset.claimDepth);
-        for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-          const depth = Number(rows[cursor].dataset.claimDepth);
-          if (depth < childDepth) {
-            visible.add(rows[cursor]);
-            childDepth = depth;
-          }
-          if (childDepth === 0) break;
-        }
-      });
-    }
-
-    rows.forEach((row) => { row.hidden = Boolean(query) && !visible.has(row); });
-    let visibleSections = 0;
-    sections.forEach((section) => {
-      const hasVisibleRows = Array.from(section.querySelectorAll("[data-claim-depth]"))
-        .some((row) => !row.hidden);
-      section.hidden = Boolean(query) && !hasVisibleRows;
-      if (!section.hidden) visibleSections += 1;
-      if (query && hasVisibleRows) section.open = true;
-    });
-    if (empty) empty.classList.toggle("hidden", visibleSections > 0 || !query);
-  };
-
   tree.addEventListener("change", (event) => {
     const checkbox = event.target.closest(".claim-node");
     if (!checkbox || checkbox.disabled) return;
@@ -271,30 +207,11 @@ document.querySelectorAll(".claim-tree").forEach((tree) => {
     }
     setRowSelected(row, checkbox);
     updateAncestors(index);
-    updateSelection();
   });
-
-  rows.forEach((row, index) => {
-    const checkbox = row.querySelector(".claim-node");
-    if (checkbox) setRowSelected(row, checkbox);
-    updateGroupState(index);
-  });
-  search?.addEventListener("input", filterRows);
-  updateSelection();
-  filterRows();
 });
 
 document.querySelectorAll(".claim-work-tree").forEach((tree) => {
   const rows = Array.from(tree.querySelectorAll("[data-work-depth]"));
-  const form = tree.closest("form");
-  const submit = form?.querySelector("[data-work-submit]");
-  const summary = form?.querySelector("[data-work-summary]");
-  const changes = form?.querySelector("[data-work-changes]");
-  const leaves = rows.filter((row) => row.dataset.workKind === "check");
-  leaves.forEach((row) => {
-    row.dataset.initialAction = row.querySelector(".claim-item-action:checked")?.value || "";
-    row.dataset.initialNote = row.querySelector(".claim-note")?.value || "";
-  });
 
   const descendants = (index) => {
     const parentDepth = Number(rows[index].dataset.workDepth);
@@ -334,27 +251,6 @@ document.querySelectorAll(".claim-work-tree").forEach((tree) => {
     }
   };
 
-  const updateSummary = () => {
-    const completed = leaves.filter((row) => row.querySelector(".claim-item-action:checked")).length;
-    const changed = leaves.filter((row) => {
-      const action = row.querySelector(".claim-item-action:checked")?.value || "";
-      const note = row.querySelector(".claim-note")?.value || "";
-      return action !== row.dataset.initialAction || note !== row.dataset.initialNote;
-    }).length;
-    if (summary) summary.textContent = `Заполнено ${completed} из ${leaves.length}`;
-    if (changes) changes.textContent = changed ? `Изменено: ${changed}` : "Изменений нет";
-    if (submit) {
-      submit.disabled = completed !== leaves.length;
-      const label = submit.querySelector("span");
-      if (label) {
-        const remaining = leaves.length - completed;
-        label.textContent = remaining
-          ? `Осталось: ${remaining}`
-          : `Отправить ${leaves.length} ${russianCount(leaves.length, "результат", "результата", "результатов")}`;
-      }
-    }
-  };
-
   tree.addEventListener("change", (event) => {
     const radio = event.target.closest("input[type='radio']");
     if (!radio) return;
@@ -369,7 +265,6 @@ document.querySelectorAll(".claim-work-tree").forEach((tree) => {
       });
     }
     refreshGroups();
-    updateSummary();
   });
 
   tree.addEventListener("input", (event) => {
@@ -384,59 +279,12 @@ document.querySelectorAll(".claim-work-tree").forEach((tree) => {
         const childNote = descendant.querySelector(".claim-note");
         if (childNote) childNote.value = note.value;
       });
+    } else {
+      refreshGroups();
     }
-    refreshGroups();
-    updateSummary();
   });
 
   refreshGroups();
-  updateSummary();
-});
-
-document.querySelectorAll("[data-result-view]").forEach((view) => {
-  const buttons = Array.from(view.querySelectorAll("[data-result-filter]"));
-  const sections = Array.from(view.querySelectorAll("[data-result-section]"));
-  const empty = view.querySelector("[data-result-empty]");
-
-  const applyFilter = (filter) => {
-    let visibleChecks = 0;
-    sections.forEach((section) => {
-      const rows = Array.from(section.querySelectorAll("[data-result-row]"));
-      const visible = new Set();
-      rows.forEach((row, index) => {
-        if (row.dataset.resultKind !== "check") return;
-        const tokens = (row.dataset.resultTokens || "").split(" ");
-        const matches = filter === "all"
-          || (filter === "exception" && ["not_ok", "skip", "note"].some((token) => tokens.includes(token)))
-          || tokens.includes(filter);
-        if (!matches) return;
-        visible.add(row);
-        visibleChecks += 1;
-        let childDepth = Number(row.dataset.resultDepth);
-        for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-          const depth = Number(rows[cursor].dataset.resultDepth);
-          if (depth < childDepth) {
-            visible.add(rows[cursor]);
-            childDepth = depth;
-          }
-        }
-      });
-      rows.forEach((row) => { row.hidden = !visible.has(row); });
-      section.hidden = visible.size === 0;
-      if (filter !== "all" && visible.size) section.open = true;
-    });
-    if (empty) empty.classList.toggle("hidden", visibleChecks > 0);
-    buttons.forEach((button) => {
-      const active = button.dataset.resultFilter === filter;
-      button.setAttribute("aria-pressed", String(active));
-      button.classList.toggle("ring-2", active);
-      button.classList.toggle("ring-zinc-950", active);
-      button.classList.toggle("ring-offset-2", active);
-    });
-  };
-
-  buttons.forEach((button) => button.addEventListener("click", () => applyFilter(button.dataset.resultFilter)));
-  applyFilter(buttons.find((button) => button.getAttribute("aria-pressed") === "true")?.dataset.resultFilter || "all");
 });
 
 const CYRILLIC_LETTERS = Array.from("абвгдежзиклмнопрстуфхцчшщэюя");

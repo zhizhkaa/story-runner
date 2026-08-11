@@ -6,7 +6,7 @@
   <form method="post" class="mt-6 grid gap-4">
     {% csrf_token %}<input type="hidden" name="next" value="{{ next }}"><input class="hidden" type="text" name="username" value="story-runner-admin" autocomplete="username" tabindex="-1">
     <label class="grid gap-1.5 text-sm text-zinc-600"><span>Пароль</span><input class="h-11 rounded-xl border border-zinc-300 px-3 text-base text-zinc-950 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 sm:text-sm" type="password" name="password" required autofocus autocomplete="current-password"></label>
-    <button class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-700 text-sm font-medium text-white hover:bg-blue-800" type="submit">Войти<i data-lucide="log-in" class="size-4" aria-hidden="true"></i></button>
+    <button class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-zinc-950 text-sm font-medium text-white hover:bg-zinc-800" type="submit">Войти<i data-lucide="log-in" class="size-4" aria-hidden="true"></i></button>
   </form>
 </section>
 {% endblock %}

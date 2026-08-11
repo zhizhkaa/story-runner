@@ -14,17 +14,14 @@
 </head>
 <body class="min-h-screen bg-zinc-50 font-sans text-zinc-950 antialiased">
   <main class="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-    <nav class="{% block nav_spacing %}mb-10{% endblock %} flex min-h-11 items-center justify-between gap-4 text-sm text-zinc-500" aria-label="Навигация">
-      <a class="inline-flex min-h-11 shrink-0 items-center gap-2 font-semibold tracking-tight text-zinc-950" href="{% url 'stories:home' %}" aria-label="Story Runner — главная"><span class="grid size-7 place-items-center rounded-lg bg-blue-700 text-white"><i data-lucide="check" class="size-4" aria-hidden="true"></i></span><span class="{% if request.session.story_admin %}hidden sm:inline{% endif %}">Story Runner</span></a>
-      <div class="flex items-center gap-3 sm:gap-4">
-        {% if request.session.story_admin %}
-          <a class="inline-flex min-h-11 items-center transition hover:text-zinc-950" href="{% url 'stories:home' %}">Прогоны</a>
-          <a class="inline-flex min-h-11 items-center transition hover:text-zinc-950" href="{% url 'stories:manage_dashboard' %}">Управление</a>
-          <form method="post" action="{% url 'stories:manage_logout' %}">{% csrf_token %}<button class="inline-flex min-h-11 items-center transition hover:text-zinc-950" type="submit">Выйти</button></form>
-        {% else %}
-          <a class="inline-flex min-h-11 items-center transition hover:text-zinc-950" href="{% url 'stories:manage_login' %}">Войти как администратор</a>
-        {% endif %}
-      </div>
+    <nav class="mb-10 flex min-h-11 items-center justify-end gap-5 text-sm text-zinc-500" aria-label="Навигация">
+      {% if request.session.story_admin %}
+        <a class="inline-flex min-h-11 items-center transition hover:text-zinc-950" href="{% url 'stories:home' %}">Главная</a>
+        <a class="inline-flex min-h-11 items-center transition hover:text-zinc-950" href="{% url 'stories:manage_dashboard' %}">Управление</a>
+        <form method="post" action="{% url 'stories:manage_logout' %}">{% csrf_token %}<button class="inline-flex min-h-11 items-center transition hover:text-zinc-950" type="submit">Выйти</button></form>
+      {% else %}
+        <a class="inline-flex min-h-11 items-center transition hover:text-zinc-950" href="{% url 'stories:manage_login' %}">Редактировать</a>
+      {% endif %}
     </nav>
 
     {% if messages %}

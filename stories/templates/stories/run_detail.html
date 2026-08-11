@@ -1,5 +1,4 @@
 {% extends 'stories/base.html' %}
-{% block nav_spacing %}mb-4 sm:mb-6{% endblock %}
 {% block title %}{{ run.display_label }}{% endblock %}
 {% block meta %}
 <meta name="description" content="{{ share_description }}">
@@ -11,7 +10,7 @@
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="{{ og_image_alt }}">
+<meta property="og:image:alt" content="Статус прогона {{ run.get_os_display }} {{ run.version }}">
 <meta property="og:site_name" content="Story Runner">
 <meta property="og:locale" content="ru_RU">
 <meta name="twitter:card" content="summary_large_image">
@@ -20,73 +19,31 @@
 <meta name="twitter:image" content="{{ preview_url }}">
 {% endblock %}
 {% block content %}
-<a class="inline-flex min-h-11 items-center text-sm text-zinc-500 transition hover:text-zinc-950" href="{% url 'stories:home' %}">← Назад к прогонам</a>
-
-<header class="mt-3 border-b border-zinc-200 pb-6 sm:mt-4">
-  <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-    <div>
-      <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ run.display_label }}</h1>
-      {% if run.completed_at %}<time class="mt-2 block text-sm text-zinc-500" datetime="{{ run.completed_at|date:'c' }}">Завершён {{ run.completed_at|date:'d.m.Y H:i' }}</time>{% endif %}
-    </div>
-    <span class="w-fit rounded-full px-3 py-1.5 text-sm font-medium {% if summary.tone == 'ok' %}bg-emerald-100 text-emerald-800{% elif summary.tone == 'warning' or summary.tone == 'ready' %}bg-amber-100 text-amber-800{% elif summary.tone == 'not_ok' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %}">{{ summary.status }}</span>
+<a class="inline-flex min-h-11 items-center text-sm text-zinc-500 transition hover:text-zinc-950" href="{% url 'stories:home' %}">← Назад</a>
+<div class="mt-8 flex flex-col gap-2 border-b border-zinc-200 pb-6">
+  <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ run.display_label }}</h1>
+  <div class="flex flex-wrap items-center gap-3 text-sm">
+    {% if run.state == 'active' and run.is_ready %}<span class="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-800">Ожидает завершения</span>{% elif run.state == 'active' %}<span class="rounded-full bg-blue-100 px-2.5 py-1 font-medium text-blue-700">Активен</span>{% else %}<span class="rounded-full px-2.5 py-1 font-medium {% if run.final_status == 'ok' %}bg-emerald-100 text-emerald-700{% else %}bg-red-100 text-red-700{% endif %}">Завершён</span>{% endif %}
+    <span class="text-zinc-500">Готово {{ done_count }} из {{ total_count }}{% if run.state == 'active' %} · в работе {{ assigned_count }}{% endif %}</span>
+    {% if run.completed_at %}<time class="text-zinc-500" datetime="{{ run.completed_at|date:'c' }}">{{ run.completed_at|date:'d.m.Y H:i' }}</time>{% endif %}
   </div>
-
-  <dl class="mt-6 grid gap-px overflow-hidden rounded-xl bg-zinc-200 sm:grid-cols-3">
-    <div class="bg-white p-4"><dt class="text-xs font-medium text-zinc-500">Заполненность</dt><dd class="mt-1 text-lg font-semibold tabular-nums">{{ summary.done }} из {{ summary.total }}</dd></div>
-    <div class="bg-white p-4"><dt class="text-xs font-medium text-zinc-500">{% if run.state == 'completed' %}Решение администратора{% else %}Назначено участникам{% endif %}</dt><dd class="mt-1 text-lg font-semibold {% if run.final_status == 'not_ok' %}text-red-700{% elif run.final_status == 'ok' %}text-emerald-700{% else %}text-blue-700{% endif %}">{% if run.state == 'completed' %}{{ summary.decision }}{% else %}{{ assigned_count }}{% endif %}</dd></div>
-    <div class="bg-white p-4"><dt class="text-xs font-medium text-zinc-500">Отклонения</dt><dd class="mt-1 text-sm font-medium"><span class="text-red-700">НЕ ОК: {{ summary.not_ok }}</span> · <span class="text-amber-700">Пропуски: {{ summary.skipped }}</span> · Замечания: {{ summary.notes }}</dd></div>
-  </dl>
-</header>
-
-{% if summary.has_exceptions %}
-  <div class="mt-5 rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-    <strong>В прогоне есть отклонения.</strong> Итоговое решение не отменяет НЕ ОК, пропуски и замечания ниже.
-  </div>
-{% endif %}
-{% if run.final_comment %}<p class="mt-4 rounded-xl bg-zinc-100 px-4 py-3 text-sm leading-6 text-zinc-800"><strong>Комментарий администратора:</strong> {{ run.final_comment }}</p>{% endif %}
-
+</div>
+{% if run.final_comment %}<p class="mt-5 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900"><strong>Комментарий:</strong> {{ run.final_comment }}</p>{% endif %}
 <div class="mt-5 flex flex-wrap gap-2">
-  {% if run.state == 'active' and not run.is_ready %}<a class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-700 px-4 text-sm font-medium text-white hover:bg-blue-800" href="{% url 'stories:claim_select' run.public_id %}"><i data-lucide="play" class="size-4" aria-hidden="true"></i>Взять пункты</a>{% endif %}
-  <button class="copy-current-link inline-flex min-h-11 items-center gap-2 rounded-xl {% if run.state == 'completed' %}bg-blue-700 text-white hover:bg-blue-800{% else %}border border-zinc-300 bg-white hover:bg-zinc-50{% endif %} px-4 text-sm font-medium" type="button" data-copy-url="{{ share_url }}"><i data-lucide="link" class="size-4" aria-hidden="true"></i>Скопировать ссылку</button>
-  <button class="copy-text inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-medium hover:bg-zinc-50" type="button" data-copy-target="story-text"><i data-lucide="copy" class="size-4" aria-hidden="true"></i>Скопировать текст</button>
+  {% if run.state == 'active' and not run.is_ready %}<a class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-zinc-950 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800" href="{% url 'stories:claim_select' run.public_id %}"><i data-lucide="play" class="size-4" aria-hidden="true"></i>Взять в работу</a>{% endif %}
+  <button class="copy-text inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium hover:bg-zinc-50" type="button" data-copy-target="story-text"><i data-lucide="copy" class="size-4" aria-hidden="true"></i>Скопировать текст</button>
+  <button class="copy-current-link inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium hover:bg-zinc-50" type="button" data-copy-url="{{ share_url }}"><i data-lucide="link" class="size-4" aria-hidden="true"></i>Скопировать ссылку</button>
 </div>
 <textarea id="story-text" class="hidden" readonly aria-hidden="true" tabindex="-1">{{ text_body }}</textarea>
-
-<section class="mt-8" aria-labelledby="results-heading" data-result-view>
-  <div class="flex flex-col gap-4 border-b border-zinc-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
-    <div><h2 id="results-heading" class="text-2xl font-semibold tracking-tight">Результаты</h2><p class="mt-1 text-sm text-zinc-500">Разделы с отклонениями раскрыты первыми.</p></div>
-    <div class="flex flex-wrap gap-2" role="group" aria-label="Фильтр результатов">
-      <button class="min-h-11 rounded-full {% if summary.has_exceptions %}bg-zinc-100 text-zinc-700 hover:bg-zinc-200{% else %}bg-zinc-950 text-white{% endif %} px-3 text-xs font-medium" type="button" data-result-filter="all" aria-pressed="{% if summary.has_exceptions %}false{% else %}true{% endif %}">Все · {{ summary.total }}</button>
-      {% if summary.has_exceptions %}<button class="min-h-11 rounded-full bg-zinc-950 px-3 text-xs font-medium text-white" type="button" data-result-filter="exception" aria-pressed="true">Отклонения · {{ summary.exceptions }}</button>{% endif %}
-      {% if summary.not_ok %}<button class="min-h-11 rounded-full bg-red-50 px-3 text-xs font-medium text-red-800 hover:bg-red-100" type="button" data-result-filter="not_ok" aria-pressed="false">НЕ ОК · {{ summary.not_ok }}</button>{% endif %}
-      {% if summary.skipped %}<button class="min-h-11 rounded-full bg-amber-50 px-3 text-xs font-medium text-amber-800 hover:bg-amber-100" type="button" data-result-filter="skip" aria-pressed="false">Пропуски · {{ summary.skipped }}</button>{% endif %}
-      {% if summary.notes %}<button class="min-h-11 rounded-full bg-zinc-100 px-3 text-xs font-medium text-zinc-700 hover:bg-zinc-200" type="button" data-result-filter="note" aria-pressed="false">С замечаниями · {{ summary.notes }}</button>{% endif %}
+<div class="mt-3 max-h-[70vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-5 font-mono text-sm leading-6 text-zinc-700 shadow-sm" aria-label="Результат прогона">
+  {% for row in result_rows %}
+    <div class="break-words" style="padding-left: {{ row.indent }}">
+      {% if row.is_group %}
+        <strong class="font-semibold text-zinc-950">{{ row.node.code }} {{ row.node.title }}</strong>
+      {% else %}
+        <span>{{ row.node.code }} {{ row.node.title }} — </span><strong class="font-semibold {% if row.status_tone == 'ok' %}text-emerald-700{% elif row.status_tone == 'not_ok' %}text-red-700{% elif row.status_tone == 'working' %}text-blue-700{% elif row.status_tone == 'skip' %}text-amber-700{% else %}text-zinc-500{% endif %}">{{ row.status_label }}</strong>{% if row.note %}<span class="ml-2 text-zinc-500">— {{ row.note }}</span>{% endif %}
+      {% endif %}
     </div>
-  </div>
-
-  <div class="divide-y divide-zinc-200 border-b border-zinc-200" data-result-sections>
-    {% for section in result_sections %}
-      <details class="group py-1" data-result-section {% if section.has_exceptions %}open{% endif %}>
-        <summary class="flex min-h-14 cursor-pointer list-none items-center gap-3 py-3 [&::-webkit-details-marker]:hidden">
-          <i data-lucide="chevron-down" class="size-4 shrink-0 text-zinc-500 transition group-open:rotate-180" aria-hidden="true"></i>
-          <strong class="min-w-0 flex-1 text-sm sm:text-base">{{ section.heading.node.code }} {{ section.heading.node.title }}</strong>
-          <span class="shrink-0 text-xs text-zinc-500">Пунктов: {{ section.total }}{% if section.has_exceptions %} · <span class="font-medium text-amber-700">есть отклонения</span>{% endif %}</span>
-        </summary>
-        <ul class="pb-4" aria-label="Пункты раздела {{ section.heading.node.code }}">
-          {% for row in section.rows %}
-            <li class="result-row grid gap-1 py-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-4" style="padding-left: calc({{ row.depth }} * 1rem)" data-result-row data-result-depth="{{ row.depth }}" data-result-kind="{% if row.is_group %}group{% else %}check{% endif %}" data-result-tokens="{{ row.filter_tokens }}">
-              {% if row.is_group %}
-                <strong class="font-semibold text-zinc-900">{{ row.node.code }} {{ row.node.title }}</strong>
-              {% else %}
-                <span class="min-w-0 break-words text-zinc-700"><strong class="font-semibold text-zinc-900">{{ row.node.code }}</strong> {{ row.node.title }}{% if row.note %}<span class="mt-1 block text-xs leading-5 text-zinc-500">{{ row.note }}</span>{% endif %}</span>
-                <strong class="font-semibold {% if row.status_tone == 'ok' %}text-emerald-700{% elif row.status_tone == 'not_ok' %}text-red-700{% elif row.status_tone == 'working' %}text-blue-700{% elif row.status_tone == 'skip' %}text-amber-700{% else %}text-zinc-500{% endif %}">{{ row.status_label }}</strong>
-              {% endif %}
-            </li>
-          {% endfor %}
-        </ul>
-      </details>
-    {% endfor %}
-  </div>
-  <p class="hidden py-8 text-center text-sm text-zinc-500" data-result-empty>В этом фильтре нет пунктов.</p>
-</section>
+  {% endfor %}
+</div>
 {% endblock %}
