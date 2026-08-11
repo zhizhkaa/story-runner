@@ -14,7 +14,7 @@
 </head>
 <body class="min-h-screen bg-zinc-50 font-sans text-zinc-950 antialiased">
   <main class="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-    <nav class="mb-10 flex min-h-11 items-center justify-end gap-5 text-sm text-zinc-500" aria-label="Навигация">
+    <nav class="{% block nav_spacing %}mb-10{% endblock %} flex min-h-11 items-center justify-end gap-5 text-sm text-zinc-500" aria-label="Навигация">
       {% if request.session.story_admin %}
         <a class="inline-flex min-h-11 items-center transition hover:text-zinc-950" href="{% url 'stories:home' %}">Главная</a>
         <a class="inline-flex min-h-11 items-center transition hover:text-zinc-950" href="{% url 'stories:manage_dashboard' %}">Управление</a>
