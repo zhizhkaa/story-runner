@@ -9,82 +9,85 @@
 
   <div class="grid gap-4 md:grid-cols-2">
     {% for run in active_runs %}
-      <article class="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+      <article class="rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
         <div class="flex items-center justify-between gap-4">
-          <span class="rounded-full px-2.5 py-1 text-xs font-medium {% if run.os == 'android' %}bg-emerald-100 text-emerald-800{% else %}bg-zinc-200 text-zinc-700{% endif %}">{{ run.get_os_display }}</span>
+          <span class="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700">{{ run.get_os_display }}</span>
           <span class="text-sm text-zinc-500">Сборка {{ run.build }}</span>
         </div>
         <h2 class="mt-6 text-3xl font-semibold tracking-tight">{{ run.version }}</h2>
-        {% if run.is_ready %}<p class="mt-2 text-sm font-medium text-amber-700">Ожидает завершения</p>{% endif %}
+        <p class="mt-2 text-sm font-medium {% if run.summary.tone == 'ready' %}text-amber-700{% else %}text-blue-700{% endif %}">{{ run.summary.status }}</p>
         <div class="mt-5 flex items-center gap-3">
-          <div class="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100"><div class="h-full rounded-full bg-emerald-600" style="width: {% widthratio run.done_count run.total_count 100 %}%" role="progressbar" aria-label="Готово пунктов" aria-valuemin="0" aria-valuemax="{{ run.total_count }}" aria-valuenow="{{ run.done_count }}"></div></div>
-          <span class="text-sm tabular-nums text-zinc-500">{{ run.done_count }}/{{ run.total_count }}</span>
+          <div class="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100"><div class="h-full rounded-full bg-blue-700" style="width: {% widthratio run.done_count run.total_count 100 %}%" role="progressbar" aria-label="Заполнено пунктов" aria-valuemin="0" aria-valuemax="{{ run.total_count }}" aria-valuenow="{{ run.done_count }}"></div></div>
+          <span class="text-sm tabular-nums text-zinc-500">{{ run.done_count }}/{{ run.total_count }} заполнено</span>
         </div>
         {% if run.open_claims %}<p class="mt-3 text-sm text-zinc-500">В работе: {% for claim in run.open_claims %}{{ claim.participant.display_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
         <div class="mt-6 flex flex-col gap-2 sm:flex-row">
           {% for claim in run.my_claims %}<a class="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-medium transition hover:bg-zinc-50" href="{% url 'stories:claim_work' claim.public_id %}">Продолжить</a>{% endfor %}
-          <a class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-zinc-300 px-4 text-sm font-medium transition hover:bg-zinc-50" href="{% url 'stories:run_detail' run.public_id %}"><i data-lucide="eye" class="size-4" aria-hidden="true"></i>Состояние</a>
-          {% if not run.is_ready %}<a class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800" href="{% url 'stories:claim_select' run.public_id %}"><i data-lucide="play" class="size-4" aria-hidden="true"></i>Взять пункты</a>{% endif %}
+          <a class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-zinc-300 px-4 text-sm font-medium transition hover:bg-zinc-50" href="{% url 'stories:run_detail' run.public_id %}"><i data-lucide="eye" class="size-4" aria-hidden="true"></i>Посмотреть статус</a>
+          {% if not run.is_ready %}<a class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 text-sm font-medium text-white transition hover:bg-blue-800" href="{% url 'stories:claim_select' run.public_id %}"><i data-lucide="play" class="size-4" aria-hidden="true"></i>Взять пункты</a>{% endif %}
         </div>
       </article>
     {% empty %}
-      <div class="col-span-full rounded-2xl border border-dashed border-zinc-300 px-6 py-14 text-center text-sm text-zinc-500">Активных прогонов нет</div>
+      <div class="col-span-full border-y border-zinc-200 py-8 sm:py-10">
+        <h2 class="text-lg font-semibold">Активных прогонов нет</h2>
+        <p class="mt-2 max-w-xl text-sm leading-6 text-zinc-600">Здесь появится прогон, когда администратор создаст его для Android или iOS.</p>
+        {% if request.session.story_admin %}<a class="mt-4 inline-flex min-h-11 items-center rounded-xl bg-blue-700 px-4 text-sm font-medium text-white hover:bg-blue-800" href="{% url 'stories:manage_dashboard' %}">Создать прогон</a>{% endif %}
+      </div>
     {% endfor %}
   </div>
 </section>
 
-<section class="mt-16" aria-labelledby="history-heading">
-  <h2 id="history-heading" class="text-3xl font-semibold tracking-tight sm:text-4xl">История</h2>
+<section class="mt-14" aria-labelledby="history-heading">
+  <div class="flex items-center justify-between gap-4">
+    <h2 id="history-heading" class="text-3xl font-semibold tracking-tight sm:text-4xl">История</h2>
+    <span class="text-sm text-zinc-500">Всего: {{ page_obj.paginator.count }}</span>
+  </div>
 
-  <form class="mt-5 grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-[1fr_11rem_12rem_auto]" method="get" role="search">
-    <label class="grid gap-1.5 text-sm text-zinc-600"><span>Поиск</span><input class="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-base text-zinc-950 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 sm:text-sm" type="search" name="q" value="{{ query }}" placeholder="Поиск по прогонам"></label>
-    <label class="grid gap-1.5 text-sm text-zinc-600"><span>ОС</span><select class="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-base text-zinc-950 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 sm:text-sm" name="os"><option value="">Все</option><option value="android" {% if os_filter == 'android' %}selected{% endif %}>Android</option><option value="ios" {% if os_filter == 'ios' %}selected{% endif %}>iOS</option></select></label>
-    <label class="grid gap-1.5 text-sm text-zinc-600"><span>Сортировка</span><select class="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-base text-zinc-950 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 sm:text-sm" name="sort"><option value="newest" {% if sort != 'oldest' %}selected{% endif %}>Сначала новые</option><option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>Сначала старые</option></select></label>
-    <button class="mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white transition hover:bg-zinc-800" type="submit"><i data-lucide="search" class="size-4" aria-hidden="true"></i>Найти</button>
-  </form>
+  <details class="group mt-5 border-y border-zinc-200" {% if has_filters %}open{% endif %}>
+    <summary class="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden"><span>Фильтры{% if has_filters %} · применены{% endif %}</span><i data-lucide="chevron-down" class="size-4 text-zinc-500 transition group-open:rotate-180" aria-hidden="true"></i></summary>
+    <form class="grid gap-3 pb-4 sm:grid-cols-2 lg:grid-cols-[1fr_11rem_12rem_auto]" method="get" role="search">
+      <label class="grid gap-1.5 text-sm text-zinc-600"><span>Поиск</span><input class="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-base text-zinc-950 placeholder:text-zinc-500 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 sm:text-sm" type="search" name="q" value="{{ query }}" placeholder="Версия или сборка"></label>
+      <label class="grid gap-1.5 text-sm text-zinc-600"><span>ОС</span><select class="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-base text-zinc-950 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 sm:text-sm" name="os"><option value="">Все</option><option value="android" {% if os_filter == 'android' %}selected{% endif %}>Android</option><option value="ios" {% if os_filter == 'ios' %}selected{% endif %}>iOS</option></select></label>
+      <label class="grid gap-1.5 text-sm text-zinc-600"><span>Сортировка</span><select class="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-base text-zinc-950 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 sm:text-sm" name="sort"><option value="newest" {% if sort != 'oldest' %}selected{% endif %}>Сначала новые</option><option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>Сначала старые</option></select></label>
+      <div class="flex items-end gap-2"><button class="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white hover:bg-zinc-800" type="submit"><i data-lucide="search" class="size-4" aria-hidden="true"></i>Найти</button>{% if has_filters %}<a class="inline-flex h-11 items-center justify-center px-2 text-sm font-medium text-zinc-600 hover:text-zinc-950" href="{% url 'stories:home' %}">Сбросить</a>{% endif %}</div>
+    </form>
+  </details>
 
-  <div class="mt-5 grid gap-4">
-    {% for group in groups %}
-      <article class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        {% if group.runs|length > 1 %}
-          <header class="flex flex-wrap items-center gap-3 border-b border-zinc-200 px-5 py-4">
-            <span class="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700">{{ group.os }}</span>
-            <h3 class="flex-1 font-semibold">{{ group.version }} <span class="font-normal text-zinc-500">({{ group.build }})</span></h3>
-            <span class="text-xs text-zinc-500">{{ group.runs|length }} прогон{{ group.runs|length|pluralize:"а,ов" }}</span>
-          </header>
-        {% endif %}
-        {% for run in group.runs %}
-          <details class="group border-t border-zinc-100 first:border-t-0">
-            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition hover:bg-zinc-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden">
-              <span class="grid gap-1"><strong class="text-sm font-medium sm:text-base">{{ run.display_label }}</strong><time class="text-xs text-zinc-500" datetime="{{ run.completed_at|date:'c' }}">{{ run.completed_at|date:'d.m.Y H:i' }}</time></span>
-              <i data-lucide="chevron-down" class="size-4 shrink-0 text-zinc-500 transition group-open:rotate-180" aria-hidden="true"></i>
-            </summary>
-            <div class="border-t border-zinc-100 bg-zinc-50/60 p-4 sm:p-5">
-              {% if run.final_comment %}<p class="mb-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900"><strong>Комментарий:</strong> {{ run.final_comment }}</p>{% endif %}
-              <div class="mb-3 flex flex-wrap gap-2">
-                <button class="copy-text inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium transition hover:bg-zinc-50" type="button" data-copy-target="run-text-{{ run.id }}"><i data-lucide="copy" class="size-4" aria-hidden="true"></i>Скопировать текст</button>
-                <button class="copy-link inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium transition hover:bg-zinc-50" type="button" data-copy-url="{% url 'stories:run_detail' run.public_id %}"><i data-lucide="link" class="size-4" aria-hidden="true"></i>Скопировать ссылку</button>
-                <a class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-zinc-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-800" href="{% url 'stories:run_detail' run.public_id %}" target="_blank" rel="noopener">Открыть отдельно<i data-lucide="external-link" class="size-4" aria-hidden="true"></i></a>
-              </div>
-              <textarea id="run-text-{{ run.id }}" class="hidden" readonly aria-hidden="true" tabindex="-1">{{ run.text_body }}</textarea>
-              <div class="max-h-[28rem] overflow-y-auto rounded-xl border border-zinc-200 bg-white p-4 font-mono text-sm leading-6 text-zinc-700" aria-label="Результат прогона">
-                {% for row in run.result_rows %}
-                  <div class="break-words" style="padding-left: {{ row.indent }}">
-                    {% if row.is_group %}
-                      <strong class="font-semibold text-zinc-950">{{ row.node.code }} {{ row.node.title }}</strong>
-                    {% else %}
-                      <span>{{ row.node.code }} {{ row.node.title }} — </span><strong class="font-semibold {% if row.status_tone == 'ok' %}text-emerald-700{% elif row.status_tone == 'not_ok' %}text-red-700{% elif row.status_tone == 'skip' %}text-amber-700{% else %}text-zinc-500{% endif %}">{{ row.status_label }}</strong>{% if row.note %}<span class="ml-2 text-zinc-500">— {{ row.note }}</span>{% endif %}
-                    {% endif %}
-                  </div>
-                {% endfor %}
-              </div>
+  <div class="mt-5 divide-y divide-zinc-200 border-y border-zinc-200">
+    {% for run in runs %}
+      <article class="py-5 sm:py-6">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700">{{ run.get_os_display }}</span>
+              <span class="rounded-full px-2.5 py-1 text-xs font-medium {% if run.summary.tone == 'ok' %}bg-emerald-100 text-emerald-800{% elif run.summary.tone == 'warning' %}bg-amber-100 text-amber-800{% else %}bg-red-100 text-red-800{% endif %}">{{ run.summary.status }}</span>
             </div>
-          </details>
-        {% endfor %}
+            <h3 class="mt-3 text-lg font-semibold">{{ run.version }} <span class="font-normal text-zinc-500">({{ run.build }})</span></h3>
+            <p class="mt-2 text-sm text-zinc-600">Заполнено: {{ run.summary.done }} из {{ run.summary.total }} · НЕ ОК: {{ run.summary.not_ok }} · Пропуски: {{ run.summary.skipped }} · Замечания: {{ run.summary.notes }}</p>
+            {% if run.final_comment %}<p class="mt-2 line-clamp-2 text-sm text-zinc-500">{{ run.final_comment }}</p>{% endif %}
+            <time class="mt-2 block text-xs text-zinc-500" datetime="{{ run.completed_at|date:'c' }}">{{ run.completed_at|date:'d.m.Y H:i' }}</time>
+          </div>
+          <div class="flex flex-col gap-2 sm:w-48">
+            <a class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 text-sm font-medium text-white hover:bg-blue-800" href="{% url 'stories:run_detail' run.public_id %}"><i data-lucide="eye" class="size-4" aria-hidden="true"></i>Открыть результат</a>
+            <button class="copy-link inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-medium hover:bg-zinc-50" type="button" data-copy-url="{% url 'stories:run_detail' run.public_id %}"><i data-lucide="link" class="size-4" aria-hidden="true"></i>Скопировать ссылку</button>
+          </div>
+        </div>
       </article>
     {% empty %}
-      <div class="rounded-2xl border border-dashed border-zinc-300 px-6 py-14 text-center text-sm text-zinc-500">Ничего не найдено</div>
+      <div class="py-10 text-center">
+        <p class="font-medium">{% if has_filters %}По заданным фильтрам прогонов нет{% else %}Завершённых прогонов пока нет{% endif %}</p>
+        <p class="mt-2 text-sm text-zinc-500">{% if has_filters %}Измените запрос или сбросьте фильтры.{% else %}После завершения прогоны появятся здесь.{% endif %}</p>
+        {% if has_filters %}<a class="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-blue-700 hover:text-blue-900" href="{% url 'stories:home' %}">Сбросить фильтры</a>{% endif %}
+      </div>
     {% endfor %}
   </div>
+
+  {% if page_obj.has_other_pages %}
+    <nav class="mt-5 flex items-center justify-between gap-3" aria-label="Страницы истории">
+      {% if page_obj.has_previous %}<a class="inline-flex min-h-11 items-center rounded-xl border border-zinc-300 px-4 text-sm font-medium hover:bg-zinc-50" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">← Новее</a>{% else %}<span></span>{% endif %}
+      <span class="text-sm text-zinc-500">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}<a class="inline-flex min-h-11 items-center rounded-xl border border-zinc-300 px-4 text-sm font-medium hover:bg-zinc-50" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Старше →</a>{% endif %}
+    </nav>
+  {% endif %}
 </section>
 {% endblock %}

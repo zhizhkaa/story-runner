@@ -74,31 +74,33 @@ class StoryRun(models.Model):
 
     @property
     def has_notes(self):
-        return bool(self.final_comment.strip()) or self.nodes.filter(kind=NodeKind.CHECK).exclude(note="").exists()
+        return self.nodes.filter(kind=NodeKind.CHECK).exclude(note="").exists()
 
     @property
     def has_skips(self):
-        return self.nodes.filter(kind=NodeKind.CHECK, skip_events__isnull=False).exists()
+        return self.nodes.filter(kind=NodeKind.CHECK, is_skipped=True).exists()
 
     @property
     def has_warnings(self):
-        return self.has_notes or self.has_skips
+        return self.has_exceptions
+
+    @property
+    def has_exceptions(self):
+        return self.nodes.filter(kind=NodeKind.CHECK).filter(
+            Q(result_status=ResultStatus.NOT_OK) | Q(is_skipped=True) | ~Q(note="")
+        ).exists()
 
     @property
     def status_label(self):
         if self.state == self.State.ACTIVE:
-            return "ОЖИДАЕТ ЗАВЕРШЕНИЯ" if self.is_ready else "АКТИВЕН"
-        label = "ОК ✅" if self.final_status == ResultStatus.OK else "НЕ ОК ❌"
-        return f"{label} ⚠️" if self.has_warnings else label
+            return "Ожидает завершения" if self.is_ready else "В работе"
+        if self.final_status == ResultStatus.NOT_OK:
+            return "Завершён · НЕ ОК"
+        return "Завершён с замечаниями" if self.has_exceptions else "Завершён · ОК"
 
     @property
     def display_label(self):
-        base = f"{self.get_os_display()} — {self.version} ({self.build})"
-        if self.state == self.State.ACTIVE:
-            return f"⏳ {base}" if self.is_ready else base
-        status_icon = "✅" if self.final_status == ResultStatus.OK else "❌"
-        warning = " ⚠️" if self.has_warnings else ""
-        return f"{status_icon}{warning} {base}"
+        return f"{self.get_os_display()} — {self.version} ({self.build})"
 
     @property
     def progress(self):

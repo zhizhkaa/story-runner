@@ -163,8 +163,8 @@ class StoryRunnerTests(TestCase):
         complete_run(run, ResultStatus.OK)
         run.refresh_from_db()
         self.assertEqual(run.final_status, ResultStatus.OK)
-        self.assertEqual(run.status_label, "ОК ✅ ⚠️")
-        self.assertEqual(run.display_label, "✅ ⚠️ Android — 1.2.3 (456)")
+        self.assertEqual(run.status_label, "Завершён с замечаниями")
+        self.assertEqual(run.display_label, "Android — 1.2.3 (456)")
 
     def test_skip_history_adds_run_warning_even_without_reason(self):
         run = self.make_run()
@@ -179,8 +179,8 @@ class StoryRunnerTests(TestCase):
         complete_run(run, ResultStatus.OK)
         run.refresh_from_db()
         self.assertEqual(run.final_status, ResultStatus.OK)
-        self.assertEqual(run.status_label, "ОК ✅ ⚠️")
-        self.assertEqual(run.display_label, "✅ ⚠️ Android — 1.2.3 (456)")
+        self.assertEqual(run.status_label, "Завершён с замечаниями")
+        self.assertEqual(run.display_label, "Android — 1.2.3 (456)")
 
     def test_any_failure_makes_run_failed(self):
         run = self.make_run()
@@ -192,8 +192,8 @@ class StoryRunnerTests(TestCase):
         complete_run(run, ResultStatus.NOT_OK)
         run.refresh_from_db()
         self.assertEqual(run.final_status, ResultStatus.NOT_OK)
-        self.assertEqual(run.status_label, "НЕ ОК ❌ ⚠️")
-        self.assertEqual(run.display_label, "❌ ⚠️ Android — 1.2.3 (456)")
+        self.assertEqual(run.status_label, "Завершён · НЕ ОК")
+        self.assertEqual(run.display_label, "Android — 1.2.3 (456)")
 
     def test_failure_without_notes_or_skips_has_no_warning(self):
         run = self.make_run()
@@ -202,8 +202,8 @@ class StoryRunnerTests(TestCase):
 
         complete_run(run, ResultStatus.NOT_OK)
         run.refresh_from_db()
-        self.assertEqual(run.status_label, "НЕ ОК ❌")
-        self.assertEqual(run.display_label, "❌ Android — 1.2.3 (456)")
+        self.assertEqual(run.status_label, "Завершён · НЕ ОК")
+        self.assertEqual(run.display_label, "Android — 1.2.3 (456)")
 
     def test_manual_completion_requires_every_item_and_accepts_skip(self):
         run = self.make_run()
@@ -225,7 +225,7 @@ class StoryRunnerTests(TestCase):
         self.assertContains(home, "Ожидает завершения")
         self.assertNotContains(home, "Взять пункты")
         detail = self.client.get(reverse("stories:run_detail", args=[run.public_id]))
-        self.assertContains(detail, "⏳ Android — 1.2.3 (456)")
+        self.assertContains(detail, "Android — 1.2.3 (456)")
         self.assertContains(detail, "Ожидает завершения")
         self.assertNotContains(detail, "Взять в работу")
         complete_run(run, ResultStatus.OK, "Сервисы проверены частично")
@@ -233,7 +233,7 @@ class StoryRunnerTests(TestCase):
         self.assertEqual(run.state, StoryRun.State.COMPLETED)
         self.assertEqual(run.final_status, ResultStatus.OK)
         self.assertEqual(run.final_comment, "Сервисы проверены частично")
-        self.assertEqual(run.status_label, "ОК ✅ ⚠️")
+        self.assertEqual(run.status_label, "Завершён с замечаниями")
 
     def test_completed_run_status_cannot_be_overridden(self):
         run = self.make_run()
@@ -495,18 +495,20 @@ class StoryRunnerTests(TestCase):
         )
 
         response = self.client.get(reverse("stories:run_detail", args=[run.public_id]))
-        self.assertContains(response, "Активен")
-        self.assertContains(response, "Готово 0 из 95")
+        self.assertContains(response, "В работе")
+        self.assertContains(response, "Заполненность")
+        self.assertContains(response, "0 из 95")
         self.assertContains(response, "В работе — Анна")
         self.assertContains(response, "Свободен")
-        self.assertContains(response, "Взять в работу")
+        self.assertContains(response, "Взять пункты")
         self.assertContains(response, reverse("stories:claim_select", args=[run.public_id]))
         self.assertContains(response, 'property="og:title"')
-        self.assertContains(response, '🔵 Android — 1.2.3 (123)')
+        self.assertContains(response, 'Android — 1.2.3 (123) — в работе')
+        self.assertContains(response, "preview-v2")
         self.assertContains(response, 'property="og:image"')
 
         home = self.client.get(reverse("stories:home"))
-        self.assertContains(home, "Состояние")
+        self.assertContains(home, "Посмотреть статус")
         self.assertContains(home, reverse("stories:run_detail", args=[run.public_id]))
 
         preview = self.client.get(reverse("stories:run_preview", args=[run.public_id]))
@@ -526,7 +528,12 @@ class StoryRunnerTests(TestCase):
         run.refresh_from_db()
         completed_data = _preview_data(run)
         self.assertEqual(completed_data["status"], "Завершён · ОК")
-        self.assertEqual(dict(completed_data["metrics"])["Замечаний"], 1)
+        self.assertEqual(dict(completed_data["metrics"])["Замечаний"], 0)
+
+        run.nodes.filter(code="1.1").update(note="Нужно перепроверить")
+        completed_with_note = _preview_data(run)
+        self.assertEqual(completed_with_note["status"], "Завершён с замечаниями")
+        self.assertEqual(dict(completed_with_note["metrics"])["Замечаний"], 1)
 
     def test_social_preview_handles_long_version_and_build(self):
         run = self.make_run(
@@ -546,6 +553,9 @@ class StoryRunnerTests(TestCase):
         self.assertContains(response, "Android — 1.2.3 (123)")
         self.assertNotContains(response, "Android · 1.2.3 · 123")
         self.assertContains(response, 'class="claim-row', count=run.nodes.count())
+        self.assertContains(response, "data-claim-search")
+        self.assertContains(response, "data-claim-selected")
+        self.assertContains(response, "data-claim-submit")
         first_check = run.nodes.filter(kind=NodeKind.CHECK).first()
         html = response.content.decode()
         marker = f'value="{first_check.id}"'
@@ -571,9 +581,12 @@ class StoryRunnerTests(TestCase):
         run.nodes.filter(kind=NodeKind.CHECK).update(result_status=ResultStatus.OK)
         complete_run(run, ResultStatus.OK)
         response = self.client.get(reverse("stories:home"), {"os": "android", "q": "1.2.3"})
-        self.assertContains(response, "✅ Android — 1.2.3 (456)")
-        self.assertNotContains(response, "1 прогон")
-        self.assertContains(response, "Открыть отдельно")
+        self.assertContains(response, "Android")
+        self.assertContains(response, "1.2.3")
+        self.assertContains(response, "(456)")
+        self.assertContains(response, "Всего: 1")
+        self.assertContains(response, "Открыть результат")
+        self.assertNotContains(response, 'data-result-row')
         detail = self.client.get(reverse("stories:run_detail", args=[run.public_id]))
         self.assertContains(detail, "1.1 Построение маршрута")
         self.assertContains(detail, "ОК ✅")
@@ -597,6 +610,11 @@ class StoryRunnerTests(TestCase):
         self.assertNotIn("Проверил", text)
         self.assertNotIn("Пропуск", text)
         self.assertNotIn("Примечание", text)
+
+        detail = self.client.get(reverse("stories:run_detail", args=[run.public_id]))
+        self.assertContains(detail, 'data-result-filter="exception"')
+        self.assertContains(detail, "Отклонения · 1")
+        self.assertContains(detail, 'data-result-filter="note"')
 
     def test_copied_text_marks_only_completed_top_level_sections_with_check(self):
         run = self.make_run()

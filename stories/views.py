@@ -1,10 +1,11 @@
 import io
 import secrets
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from functools import wraps
 
 from django.conf import settings
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseForbidden
@@ -34,13 +35,17 @@ from .services import (
     reopen_run,
     reset_run_nodes,
     resolve_participant,
-    run_result_rows,
+    run_result_sections,
+    run_summary,
     run_text,
     save_claim_drafts,
     submit_claim,
     tree_rows,
     node_visible_note,
 )
+
+
+PREVIEW_REVISION = "preview-v2"
 
 
 def manage_required(view):
@@ -100,6 +105,18 @@ def annotated_run_tree(run):
     return rows
 
 
+def annotated_run_sections(run):
+    sections = []
+    current = None
+    for row in annotated_run_tree(run):
+        if row["depth"] == 0:
+            current = {"heading": row, "rows": [row]}
+            sections.append(current)
+        elif current is not None:
+            current["rows"].append(row)
+    return sections
+
+
 def claim_work_rows(claim, items):
     nodes = list(claim.run.nodes.select_related("parent").prefetch_related("skip_events").all())
     by_id = {node.id: node for node in nodes}
@@ -125,6 +142,16 @@ def claim_work_rows(claim, items):
                 "visible_note": node_visible_note(node, skip_events),
             }
         )
+    for index, row in enumerate(rows):
+        if row["node"].kind != NodeKind.GROUP:
+            row["affected_count"] = 1
+            continue
+        affected_count = 0
+        for descendant in rows[index + 1 :]:
+            if descendant["depth"] <= row["depth"]:
+                break
+            affected_count += descendant["item"] is not None
+        row["affected_count"] = affected_count
     return rows
 
 
@@ -133,44 +160,45 @@ def home(request):
     participant = resolve_participant(request)
     active_runs = list(StoryRun.objects.filter(state=StoryRun.State.ACTIVE).order_by("os"))
     for run in active_runs:
-        run.done_count, run.total_count = run.progress
+        run.summary = run_summary(run)
+        run.done_count, run.total_count = run.summary["done"], run.summary["total"]
         run.open_claims = list(run.claims.filter(state=Claim.State.OPEN).select_related("participant"))
         run.my_claims = [claim for claim in run.open_claims if participant and claim.participant_id == participant.id]
 
     completed = StoryRun.objects.filter(state=StoryRun.State.COMPLETED)
     os_filter = request.GET.get("os", "")
-    query = request.GET.get("q", "").strip().casefold()
+    query = request.GET.get("q", "").strip()
     sort = request.GET.get("sort", "newest")
     if os_filter in StoryRun.OS.values:
         completed = completed.filter(os=os_filter)
-    runs = list(completed.prefetch_related("nodes__skip_events"))
     if query:
-        runs = [run for run in runs if query in run.display_label.casefold()]
-    runs.sort(key=lambda run: run.completed_at or run.created_at, reverse=sort != "oldest")
-
-    grouped = OrderedDict()
+        query_filter = Q(version__icontains=query) | Q(build__icontains=query) | Q(template_name__icontains=query)
+        if query.casefold() in {"android", "андроид"}:
+            query_filter |= Q(os=StoryRun.OS.ANDROID)
+        if query.casefold() in {"ios", "айос"}:
+            query_filter |= Q(os=StoryRun.OS.IOS)
+        completed = completed.filter(query_filter)
+    completed = completed.order_by("completed_at" if sort == "oldest" else "-completed_at")
+    page_obj = Paginator(completed, 20).get_page(request.GET.get("page"))
+    runs = list(page_obj.object_list)
     for run in runs:
-        run.text_body = run_text(run)
-        run.result_rows = run_result_rows(run)
-        key = (run.os, run.version, run.build)
-        if key not in grouped:
-            grouped[key] = {
-                "os": run.get_os_display(),
-                "version": run.version,
-                "build": run.build,
-                "runs": [],
-            }
-        grouped[key]["runs"].append(run)
+        run.summary = run_summary(run)
+
+    page_query = request.GET.copy()
+    page_query.pop("page", None)
 
     return render(
         request,
         "stories/home.html",
         {
             "active_runs": active_runs,
-            "groups": grouped.values(),
+            "runs": runs,
+            "page_obj": page_obj,
+            "page_query": page_query.urlencode(),
             "os_filter": os_filter,
             "query": request.GET.get("q", ""),
             "sort": sort,
+            "has_filters": bool(os_filter or query or sort == "oldest"),
             "participant": participant,
         },
     )
@@ -184,12 +212,14 @@ def healthz(request):
 @require_GET
 def run_detail(request, public_id):
     run = get_object_or_404(StoryRun, public_id=public_id)
-    done_count, total_count = run.progress
+    summary = run_summary(run)
+    done_count, total_count = summary["done"], summary["total"]
     assigned_count = run.claims.filter(state=Claim.State.OPEN).aggregate(
         total=Count("items")
     )["total"] or 0
     share_version = (
-        f"{run.state}-{run.final_status or 'none'}-{done_count}-{assigned_count}-"
+        f"{PREVIEW_REVISION}-{run.state}-{run.final_status or 'none'}-{done_count}-"
+        f"{summary['not_ok']}-{summary['skipped']}-{summary['notes']}-{assigned_count}-"
         f"{int((run.completed_at or run.created_at).timestamp())}"
     )
     detail_url = request.build_absolute_uri(reverse("stories:run_detail", args=[run.public_id]))
@@ -198,24 +228,33 @@ def run_detail(request, public_id):
     preview_url = f"{preview_url}?v={share_version}"
     if run.state == StoryRun.State.ACTIVE:
         if run.is_ready:
-            share_title = f"⏳ {run.get_os_display()} — {run.version} ({run.build})"
+            share_title = f"{run.display_label} — ожидает завершения"
             share_description = f"Все {total_count} пунктов заполнены. Ожидает завершения администратором."
         else:
-            share_title = f"🔵 {run.get_os_display()} — {run.version} ({run.build})"
-            share_description = f"Активен: готово {done_count} из {total_count}, в работе {assigned_count}."
+            share_title = f"{run.display_label} — в работе"
+            share_description = f"Заполнено {done_count} из {total_count}, в работе {assigned_count}."
     else:
-        share_title = run.display_label
-        result = "все пункты пройдены" if run.final_status == ResultStatus.OK else "есть ошибки"
-        share_description = f"Завершён: {done_count} из {total_count}, {result}."
+        share_title = f"{run.display_label} — {summary['status'].casefold()}"
+        share_description = (
+            f"{summary['status']}. Решение администратора: {summary['decision']}. "
+            f"Заполнено {done_count} из {total_count}; НЕ ОК: {summary['not_ok']}, "
+            f"пропуски: {summary['skipped']}, замечания: {summary['notes']}."
+        )
         if run.final_comment:
             share_description += f" {run.final_comment}"
+    og_image_alt = (
+        f"{summary['status']}: {run.get_os_display()} {run.version}, сборка {run.build}. "
+        f"Заполнено {done_count} из {total_count}; НЕ ОК: {summary['not_ok']}, "
+        f"пропуски: {summary['skipped']}, замечания: {summary['notes']}."
+    )
     return render(
         request,
         "stories/run_detail.html",
         {
             "run": run,
             "text_body": run_text(run),
-            "result_rows": run_result_rows(run),
+            "result_sections": run_result_sections(run),
+            "summary": summary,
             "done_count": done_count,
             "total_count": total_count,
             "assigned_count": assigned_count,
@@ -223,6 +262,7 @@ def run_detail(request, public_id):
             "share_description": share_description,
             "share_url": share_url,
             "preview_url": preview_url,
+            "og_image_alt": og_image_alt,
         },
     )
 
@@ -263,7 +303,7 @@ def run_preview(request, public_id):
 
     progress_text = f"{data['done']} / {data['total']}"
     draw.text((650, 195), progress_text, font=progress_font, fill="#18181b")
-    draw.text((650, 278), "пунктов готово", font=label_font, fill="#52525b")
+    draw.text((650, 278), "пунктов заполнено", font=label_font, fill="#52525b")
     progress_width = 460
     draw.rounded_rectangle((650, 332, 650 + progress_width, 350), radius=9, fill="#e4e4e7")
     filled_width = int(progress_width * data["done"] / data["total"]) if data["total"] else 0
@@ -291,22 +331,15 @@ def run_preview(request, public_id):
 
 
 def _preview_data(run):
-    checks = run.nodes.filter(kind=NodeKind.CHECK)
-    stats = checks.aggregate(
-        total=Count("id"),
-        ok=Count("id", filter=Q(result_status=ResultStatus.OK)),
-        not_ok=Count("id", filter=Q(result_status=ResultStatus.NOT_OK)),
-        skipped=Count("id", filter=Q(is_skipped=True)),
-        notes=Count("id", filter=~Q(note="")),
-    )
-    done = stats["ok"] + stats["not_ok"] + stats["skipped"]
+    stats = run_summary(run)
+    done = stats["done"]
     open_claims = run.claims.filter(state=Claim.State.OPEN)
     assigned = open_claims.aggregate(total=Count("items"))["total"] or 0
     participants = open_claims.values("participant_id").distinct().count()
     free = max(stats["total"] - done - assigned, 0)
 
-    if run.state == StoryRun.State.ACTIVE and done == stats["total"] and stats["total"]:
-        status = "Ожидает завершения"
+    if stats["tone"] == "ready":
+        status = stats["status"]
         accent = "#b45309"
         soft = "#fffbeb"
         metrics = (
@@ -315,8 +348,8 @@ def _preview_data(run):
             ("Пропусков", stats["skipped"]),
             ("Замечаний", stats["notes"]),
         )
-    elif run.state == StoryRun.State.ACTIVE:
-        status = "В работе"
+    elif stats["tone"] == "active":
+        status = stats["status"]
         accent = "#1d4ed8"
         soft = "#eff6ff"
         metrics = (
@@ -325,25 +358,35 @@ def _preview_data(run):
             ("Участников", participants),
             ("Пропусков", stats["skipped"]),
         )
-    elif run.final_status == ResultStatus.OK:
-        status = "Завершён · ОК"
+    elif stats["tone"] == "ok":
+        status = stats["status"]
         accent = "#047857"
         soft = "#ecfdf5"
         metrics = (
             ("ОК", stats["ok"]),
             ("НЕ ОК", stats["not_ok"]),
             ("Пропусков", stats["skipped"]),
-            ("Замечаний", stats["notes"] + bool(run.final_comment.strip())),
+            ("Замечаний", stats["notes"]),
+        )
+    elif stats["tone"] == "warning":
+        status = stats["status"]
+        accent = "#b45309"
+        soft = "#fffbeb"
+        metrics = (
+            ("ОК", stats["ok"]),
+            ("НЕ ОК", stats["not_ok"]),
+            ("Пропусков", stats["skipped"]),
+            ("Замечаний", stats["notes"]),
         )
     else:
-        status = "Завершён · НЕ ОК"
+        status = stats["status"]
         accent = "#b91c1c"
         soft = "#fef2f2"
         metrics = (
             ("ОК", stats["ok"]),
             ("НЕ ОК", stats["not_ok"]),
             ("Пропусков", stats["skipped"]),
-            ("Замечаний", stats["notes"] + bool(run.final_comment.strip())),
+            ("Замечаний", stats["notes"]),
         )
 
     return {
@@ -431,7 +474,7 @@ def claim_select(request, public_id):
     return render(
         request,
         "stories/claim_select.html",
-        {"run": run, "rows": annotated_run_tree(run), "participant": participant},
+        {"run": run, "sections": annotated_run_sections(run), "participant": participant},
     )
 
 
@@ -580,10 +623,13 @@ def manage_dashboard(request):
 
     active_runs = list(StoryRun.objects.filter(state=StoryRun.State.ACTIVE).prefetch_related("claims__participant", "nodes"))
     for run in active_runs:
-        run.done_count, run.total_count = run.progress
+        run.summary = run_summary(run)
+        run.done_count, run.total_count = run.summary["done"], run.summary["total"]
         run.tree_rows = annotated_run_tree(run)
         run.open_claims = list(run.claims.filter(state=Claim.State.OPEN).select_related("participant"))
-    recent_runs = StoryRun.objects.filter(state=StoryRun.State.COMPLETED)
+    recent_runs = list(StoryRun.objects.filter(state=StoryRun.State.COMPLETED)[:20])
+    for run in recent_runs:
+        run.summary = run_summary(run)
     return render(
         request,
         "stories/manage/dashboard.html",

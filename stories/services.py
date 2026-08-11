@@ -3,7 +3,7 @@ import secrets
 from collections import defaultdict
 
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from .models import (
@@ -301,6 +301,37 @@ def node_status(run, node, claimed_names):
     return "БЕЗ РЕЗУЛЬТАТА", "empty"
 
 
+def run_summary(run):
+    checks = run.nodes.filter(kind=NodeKind.CHECK)
+    stats = checks.aggregate(
+        total=Count("id"),
+        ok=Count("id", filter=Q(result_status=ResultStatus.OK)),
+        not_ok=Count("id", filter=Q(result_status=ResultStatus.NOT_OK)),
+        skipped=Count("id", filter=Q(is_skipped=True)),
+        notes=Count("id", filter=~Q(note="")),
+        exceptions=Count(
+            "id",
+            filter=Q(result_status=ResultStatus.NOT_OK) | Q(is_skipped=True) | ~Q(note=""),
+            distinct=True,
+        ),
+    )
+    stats["done"] = stats["ok"] + stats["not_ok"] + stats["skipped"]
+    stats["has_exceptions"] = stats["exceptions"] > 0
+    stats["decision"] = run.get_final_status_display() if run.final_status else ""
+
+    if run.state == StoryRun.State.ACTIVE and stats["done"] == stats["total"] and stats["total"]:
+        stats.update(status="Ожидает завершения", tone="ready")
+    elif run.state == StoryRun.State.ACTIVE:
+        stats.update(status="В работе", tone="active")
+    elif run.final_status == ResultStatus.NOT_OK:
+        stats.update(status="Завершён · НЕ ОК", tone="not_ok")
+    elif stats["has_exceptions"]:
+        stats.update(status="Завершён с замечаниями", tone="warning")
+    else:
+        stats.update(status="Завершён · ОК", tone="ok")
+    return stats
+
+
 def run_text(run):
     lines = [f"{run.get_os_display()} — {run.version} ({run.build})"]
     if run.final_comment:
@@ -359,15 +390,51 @@ def run_result_rows(run):
         visible_note = node_visible_note(node, skip_events)
         row = {
             "node": node,
+            "depth": depth,
             "indent": f"{depth * 1.25:g}rem",
             "is_group": node.kind == NodeKind.GROUP,
             "status_label": "",
             "status_tone": "",
             "note": visible_note,
+            "filter_tokens": "",
         }
         if node.kind == NodeKind.CHECK:
             row["status_label"], row["status_tone"] = node_status(run, node, claimed_names)
+            tokens = [row["status_tone"]]
             if visible_note:
                 row["status_label"] += " ⚠️"
+            if node.note:
+                tokens.append("note")
+            row["filter_tokens"] = " ".join(tokens)
         rows.append(row)
     return rows
+
+
+def run_result_sections(run):
+    sections = []
+    current = None
+    for row in run_result_rows(run):
+        if row["depth"] == 0:
+            current = {
+                "heading": row,
+                "rows": [],
+                "total": 0,
+                "not_ok": 0,
+                "skipped": 0,
+                "notes": 0,
+            }
+            sections.append(current)
+            if not row["is_group"]:
+                current["rows"].append(row)
+        elif current is not None:
+            current["rows"].append(row)
+
+        if current is not None and not row["is_group"]:
+            current["total"] += 1
+            current["not_ok"] += row["status_tone"] == "not_ok"
+            current["skipped"] += row["status_tone"] == "skip"
+            current["notes"] += bool(row["node"].note)
+
+    for section in sections:
+        section["has_exceptions"] = bool(section["not_ok"] or section["skipped"] or section["notes"])
+    return sections
