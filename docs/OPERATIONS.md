@@ -12,28 +12,24 @@ docker compose start
 
 Восстановление выполняется заменой файла базы при остановленном контейнере.
 
-## Обновление
+## Обновление контейнера
 
-Обычный push запускает CI. Production-деплой запускается после успешного CI
-аннотированным тегом с префиксом `deploy-`:
-
-```bash
-git tag -a deploy-YYYY-MM-DD-N -m "Deploy YYYY-MM-DD N"
-git push origin main
-git push origin deploy-YYYY-MM-DD-N
-```
-
-Workflow подключается к VPS, обновляет `/opt/story-runner` до коммита из тега,
-пересобирает контейнер и проверяет `/healthz/`. Ручное обновление:
+После получения новой версии кода пересоберите и перезапустите контейнер:
 
 ```bash
-docker compose down
+git pull --ff-only
 docker compose up --build -d
 ```
 
-Миграции применяются автоматически перед запуском Gunicorn.
+Миграции применяются автоматически перед запуском Gunicorn. После обновления
+проверьте состояние контейнера и служебный endpoint:
 
-## Будущее размещение рядом с другим Django-проектом
+```bash
+docker compose ps
+curl --fail --retry 12 --retry-all-errors http://127.0.0.1:8001/healthz/
+```
+
+## Размещение рядом с другим Django-проектом
 
 Story Runner остаётся отдельным процессом и слушает собственный внутренний порт. Reverse proxy направляет выбранный домен или путь на Story Runner, а существующий Django-проект продолжает работать на своём адресе. Перед этим нужно:
 
@@ -68,16 +64,10 @@ CSRF_TRUSTED_ORIGINS=https://story.zhizhka.ru
 ```bash
 docker compose up --build -d
 docker compose ps
-curl --fail http://127.0.0.1:8001/healthz/
+curl --fail --retry 12 --retry-all-errors http://127.0.0.1:8001/healthz/
 docker compose config | grep -A8 'zhizhka-web'
 ```
 
-## GitHub Pages
-
-GitHub Pages публикует статические HTML-, CSS- и JavaScript-файлы. Story Runner нельзя разместить там целиком: сервису нужны Django, SQLite, серверные POST-запросы, транзакции и общая база данных. GitHub Pages можно использовать только для отдельной статической витрины.
-
-Для рабочего сервиса нужен хост с постоянным Python-процессом и диском. В текущей схеме проще всего запустить Docker-контейнер на существующем сервере и выделить ему поддомен, например `story.zhizhka.ru`.
-
 ## Превью ссылок
 
-Каждая публичная страница прогона отдаёт Open Graph- и Twitter Card-метаданны, а также PNG-карточку 1200 × 630. Для работы превью адрес должен быть пубичным, доступным без авторизации и работать по HTTPS. `localhost` и закрытый внутренний адрес Telegram открыть не сможет.
+Каждая публичная страница прогона отдаёт Open Graph- и Twitter Card-метаданные, а также PNG-карточку 1200 × 630. Для работы превью адрес должен быть публичным, доступным без авторизации и работать по HTTPS. `localhost` и закрытый внутренний адрес Telegram открыть не сможет.

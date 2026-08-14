@@ -48,6 +48,8 @@ docker compose down
 ```bash
 uv venv .venv
 uv pip install --python .venv/bin/python -r requirements.txt
+npm ci
+npm run assets:build
 .venv/bin/python manage.py migrate
 .venv/bin/python manage.py runserver 8001
 ```
@@ -57,13 +59,6 @@ uv pip install --python .venv/bin/python -r requirements.txt
 ```bash
 .venv/bin/python manage.py test
 .venv/bin/python manage.py check
-```
-
-Стили и минимальный локальный набор используемых Lucide Icons собираются одной командой:
-
-```bash
-npm ci
-npm run assets:build
 ```
 
 ## Основной сценарий
@@ -77,6 +72,7 @@ npm run assets:build
 
 Дополнительная документация:
 
+- [Описание продукта](docs/PRODUCT.md)
 - [Архитектура](docs/ARCHITECTURE.md)
 - [Пользовательские сценарии](docs/SCENARIOS.md)
 - [Эксплуатация и резервное копирование](docs/OPERATIONS.md)

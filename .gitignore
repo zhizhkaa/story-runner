@@ -9,5 +9,5 @@ data/backups/
 staticfiles/
 .pytest_cache/
 node_modules/
-stories/static/stories/lucide.min.js
-stories/static/stories/lucide.min.js.map
+stories/static/stories/icons.js
+stories/static/stories/styles.css
